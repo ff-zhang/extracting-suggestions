@@ -1,8 +1,7 @@
 import math
 
-import tensorflow as tf
 import numpy as np
-
+import tensorflow as tf
 import tqdm
 
 
@@ -16,8 +15,7 @@ class Word2Vec(tf.keras.Model):
     def call(self, pair):
         target, context = pair
 
-        # target: (batch, dummy?)
-        # context: (batch, context)
+        # target: (batch, dummy?),  context: (batch, context)
         if len(target.shape) == 2:
             target = tf.squeeze(target, axis=1)
 
@@ -31,13 +29,8 @@ class Word2Vec(tf.keras.Model):
         return dots
 
 
-def custom_loss(x_logit, y_true):
-    return tf.nn.sigmoid_cross_entropy_with_logits(logits=x_logit, labels=y_true)
-
-
-# Generates skip-gram pairs with negative sampling for a list of sequences
-# (int-encoded sentences) based on window size, number of negative samples
-# and vocabulary size.
+# Generates skip-gram pairs with negative sampling for a list of sequences  (int-encoded sentences)
+# based on window size, number of negative samples and vocabulary size.
 def generate_training_data(sequences, window_size, num_ns, vocab_size, seed):
     # Elements of each training example are appended to these lists.
     targets, contexts, labels = [], [], []
@@ -85,9 +78,10 @@ def generate_training_data(sequences, window_size, num_ns, vocab_size, seed):
 
 
 if __name__ == '__main__':
-    import pathlib, yaml
+    import pathlib
+    import yaml
 
-    from preprocessing import import_excel, preprocess_text, make_datasets_from_ndarray, vectorize_dataset
+    from preprocessing import import_excel, make_ds_from_ndarray, create_vectorize_layer, vectorize_dataset
 
     with open('settings.yaml', 'r') as f:
         env_vars = yaml.safe_load(f)
@@ -101,32 +95,20 @@ if __name__ == '__main__':
     # Columns containing free response questions
     cols = [14, 15, 27, 35, 40, 44, 45, 54, 55, 70, 76, 80, 92, 93, 94]
 
-    dataset = import_excel(file_name, settings['PASSWORD'], (2, 3), (351, 97), sheet=3, cols=cols)
-    # Turns array of data into column vector before preprocessing
-    dataset = preprocess_text(dataset.flatten()[..., None])
-
+    array_ds = import_excel(file_name, settings['PASSWORD'], (2, 3), (351, 97), sheet=3, cols=cols)
     coding = import_excel(file_name, settings['PASSWORD'], (2, 2), (351, 16), sheet=4).flatten()
+    # Turns array of data into column vector before preprocessing (might remove)
+    array_ds = array_ds.flatten()[..., None]
     # Temporary (simple) coding and will be removed
     for i in range(coding.shape[0]):
         coding[i] = bool(coding[i])
 
     # Creates the training, testing, and validation datasets
-    train_ds, val_ds, test_ds = make_datasets_from_ndarray(dataset, coding)
-
-    # Text vectorization layer
-    vectorize_layer = tf.keras.layers.TextVectorization(
-        max_tokens=None,
-        standardize=None,
-        split=None,
-        output_mode='int',
-        output_sequence_length=None,
-    )
-
-    # Make a text-only dataset (without labels), then call adapt
-    vectorize_layer.adapt(train_ds.map(lambda x, y: x))
+    ds_list = make_ds_from_ndarray(array_ds, coding, **params)
+    vectorize_layer = create_vectorize_layer(ds_list)
 
     # Vectorize the training, validation, and test datasets
-    train_vec_ds, val_vec_ds, test_vec_ds = vectorize_dataset(vectorize_layer, train_ds, val_ds, test_ds)
+    train_vec_ds, val_vec_ds, test_vec_ds = vectorize_dataset(vectorize_layer, *ds_list, **params)
 
     targets, contexts, labels = generate_training_data(
         sequences=train_vec_ds.map(lambda x, y: x),
