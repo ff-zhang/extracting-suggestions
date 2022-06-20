@@ -27,7 +27,7 @@ def preprocess_text_ds(text_ds: np.ndarray):
     lemmatizer = nltk.stem.WordNetLemmatizer()
 
     for text in text_ds:
-        sentence = text[0].lower()
+        sentence = text.lower()
         words = nltk.tokenize.word_tokenize(sentence)
 
         processed.append(np.array([lemmatizer.lemmatize(w) for w in words]))
@@ -102,4 +102,19 @@ def vectorize_dataset(vectorize_layer: tf.keras.layers.TextVectorization, *args,
 
 
 if __name__ == '__main__':
-    pass
+    with open('settings.yaml', 'r') as f:
+        env_vars = yaml.safe_load(f)
+
+        settings = env_vars['SETTINGS']
+        params = env_vars['PARAMETERS']
+
+    data_dir = pathlib.Path().resolve() / settings['DATA_DIR']
+    file_name = data_dir / 'SALG-Instrument-78901-2.xlsx'
+
+    array_ds = import_excel(file_name, settings['PASSWORD'], (1, 1), (89, 15), sheet=6).flatten()
+    coding = import_excel(file_name, settings['PASSWORD'], (1, 1), (89, 15), sheet=7).flatten()
+
+    # Only consider entries that have been labelled
+    mask = (coding != '-') & (coding != '+')
+    mask_ds = np.ma.masked_array(array_ds, mask)
+    mask_code = np.ma.masked_array(coding, mask)

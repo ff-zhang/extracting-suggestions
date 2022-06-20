@@ -89,22 +89,19 @@ if __name__ == '__main__':
         settings = env_vars['SETTINGS']
         params = env_vars['PARAMETERS']
 
-    data_dir = pathlib.Path().resolve()/settings['DATA_DIR']
-    file_name = data_dir/settings['EXCEL_FILE']
+    data_dir = pathlib.Path().resolve() / settings['DATA_DIR']
+    file_name = data_dir / 'SALG-Instrument-78901-2.xlsx'
 
-    # Columns containing free response questions
-    cols = [14, 15, 27, 35, 40, 44, 45, 54, 55, 70, 76, 80, 92, 93, 94]
+    array_ds = import_excel(file_name, settings['PASSWORD'], (1, 1), (88, 15), sheet=6).flatten()
+    coding = import_excel(file_name, settings['PASSWORD'], (1, 1), (88, 15), sheet=7).flatten()
 
-    array_ds = import_excel(file_name, settings['PASSWORD'], (2, 3), (351, 97), sheet=3, cols=cols)
-    coding = import_excel(file_name, settings['PASSWORD'], (2, 2), (351, 16), sheet=4).flatten()
-    # Turns array of data into column vector before preprocessing (might remove)
-    array_ds = array_ds.flatten()[..., None]
-    # Temporary (simple) coding and will be removed
-    for i in range(coding.shape[0]):
-        coding[i] = bool(coding[i])
+    # Only consider entries that have been labelled
+    mask = (coding != '-') & (coding != '+')
+    mask_ds = np.ma.masked_array(array_ds, mask).compressed()
+    mask_code = np.ma.masked_array(coding, mask).compressed()
 
     # Creates the training, testing, and validation datasets
-    ds_list = make_ds_from_ndarray(array_ds, coding, **params)
+    ds_list = make_ds_from_ndarray(mask_ds, mask_code, **params)
     vectorize_layer = create_vectorize_layer(ds_list)
 
     # Vectorize the training, validation, and test datasets
@@ -132,8 +129,7 @@ if __name__ == '__main__':
 
     dataset = dataset.cache().prefetch(buffer_size=eval(params['AUTOTUNE']))
 
-    embedding_dim = 128
-    word2vec = Word2Vec(vectorize_layer.vocabulary_size(), embedding_dim)
+    word2vec = Word2Vec(vectorize_layer.vocabulary_size(), params['EMBEDDING_DIM'])
     word2vec.compile(optimizer='adam',
                      loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True),
                      metrics=['accuracy'])
