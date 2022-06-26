@@ -81,7 +81,8 @@ if __name__ == '__main__':
     import pathlib
     import yaml
 
-    from preprocessing import import_excel, make_ds_from_ndarray, create_vectorize_layer, vectorize_dataset
+    from preprocessing import import_multiple_excel, ds_from_ndarray, create_vectorize_layer, \
+    preprocess_text_ds, vectorize_dataset
 
     with open('settings.yaml', 'r') as f:
         env_vars = yaml.safe_load(f)
@@ -90,18 +91,17 @@ if __name__ == '__main__':
         params = env_vars['PARAMETERS']
 
     data_dir = pathlib.Path().resolve() / settings['DATA_DIR']
-    file_name = data_dir / 'SALG-Instrument-78901-2.xlsx'
+    files = [data_dir / f for f in ('SALG-Instrument-78901-2.xlsx', 'SALG-Instrument-92396.xlsx')]
 
-    array_ds = import_excel(file_name, settings['PASSWORD'], (1, 1), (88, 15), sheet=6).flatten()
-    coding = import_excel(file_name, settings['PASSWORD'], (1, 1), (88, 15), sheet=7).flatten()
+    text_ds, code_ds = import_multiple_excel(files, 'matter22', [(1, 1)] * 2, [(89, 15), (353, 18)], [(6, 7), (5, 6)])
 
     # Only consider entries that have been labelled
-    mask = (coding != '-') & (coding != '+')
-    mask_ds = np.ma.masked_array(array_ds, mask).compressed()
-    mask_code = np.ma.masked_array(coding, mask).compressed()
+    mask = (code_ds != '-') & (code_ds != '+')
+    mask_ds = preprocess_text_ds(np.ma.masked_array(text_ds, mask).compressed())
+    mask_code = np.ma.masked_array(code_ds, mask).compressed()
 
     # Creates the training, testing, and validation datasets
-    ds_list = make_ds_from_ndarray(mask_ds, mask_code, **params)
+    ds_list = ds_from_ndarray(mask_ds, mask_code, **params)
     vectorize_layer = create_vectorize_layer(ds_list)
 
     # Vectorize the training, validation, and test datasets

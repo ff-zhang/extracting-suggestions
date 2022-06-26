@@ -1,4 +1,6 @@
 import pathlib
+from typing import Union
+
 import win32com.client
 import yaml
 
@@ -19,6 +21,29 @@ def import_excel(file: pathlib.Path, password: str, start_cell: tuple[int, int],
     xlws = xlwb.Sheets(sheet)
 
     return np.array(xlws.Range(xlws.Cells(*start_cell), xlws.Cells(*end_cell)).Value)[:, cols]
+
+
+def import_multiple_excel(files: list[pathlib.Path], password: str, starts: list[tuple],
+                          ends: list[tuple], sheets: list[tuple], cols: list[Union[list, None]] = None):
+    assert len(files) == len(starts) == len(ends) == len(sheets)
+    if cols:
+        assert len(files) == len(cols)
+
+    text_ds, code_ds = np.empty(0), np.empty(0)
+
+    for i in range(len(files)):
+        if cols:
+            f_text_ds = import_excel(files[i], password, starts[i], ends[i], sheets[i][0], cols[i])
+            f_code_ds = import_excel(files[i], password, starts[i], ends[i], sheets[i][1], cols[i])
+
+        else:
+            f_text_ds = import_excel(files[i], password, starts[i], ends[i], sheets[i][0])
+            f_code_ds = import_excel(files[i], password, starts[i], ends[i], sheets[i][1])
+
+        text_ds = np.concatenate((text_ds, f_text_ds.flatten()))
+        code_ds = np.concatenate((code_ds, f_code_ds.flatten()))
+
+    return text_ds, code_ds
 
 
 def preprocess_text_ds(text_ds: np.ndarray):
@@ -42,11 +67,8 @@ def preprocess_text_ds(text_ds: np.ndarray):
     return out
 
 
-def make_ds_from_ndarray(x: np.ndarray, y: np.ndarray, train_per=0.7, val_per=0.15, test_per=0.15, **params):
+def ds_from_ndarray(x: np.ndarray, y: np.ndarray, train_per=0.7, val_per=0.15, test_per=0.15, **params):
     assert train_per + val_per + test_per == 1.0
-
-    x = preprocess_text_ds(x)
-
     x_train, x_test, y_train, y_test = sklearn.model_selection.train_test_split(
         x, y, train_size=train_per, stratify=y)
     x_val, x_test, y_val, y_test = sklearn.model_selection.train_test_split(
@@ -64,7 +86,17 @@ def make_ds_from_ndarray(x: np.ndarray, y: np.ndarray, train_per=0.7, val_per=0.
     return train_ds, val_ds, test_ds
 
 
-def create_vectorize_layer(ds_list: tuple[tf.data.Dataset], **params):
+def kfold_ds_from_ndarray(x: np.ndarray, y: np.ndarray, num_split: int):
+    def _gen():
+        for i_train, i_test in sklearn.model_selection.KFold(num_split).split(x):
+            x_train, x_test = x[i_train], y[i_test]
+            y_train, y_test = y[i_train], y[i_test]
+            yield x_train, y_train, x_test, y_test
+
+    return tf.data.Dataset.from_generator(_gen, output_signature=())
+
+
+def create_vectorize_layer(*ds_list: tuple[tf.data.Dataset], **params):
     # Combines a list of datasets into one
     def _concatenate_ds(ds_list: tuple[tf.data.Dataset]):
         ds0 = tf.data.Dataset.from_tensors(ds_list[0])
@@ -85,10 +117,11 @@ def create_vectorize_layer(ds_list: tuple[tf.data.Dataset], **params):
     # ds = tf.data.Dataset.zip(ds_list).flat_map(lambda *args: _concatenate_ds(args))
 
     ds_text_list = [ds.map(lambda x, y: x).unbatch() for ds in ds_list]
-    choice_ds = [0] * ds_text_list[0].cardinality().numpy()
+    choice_ds = [tf.cast(0, tf.int64)] * ds_text_list[0].cardinality().numpy()
     for i, ds in enumerate(ds_text_list[1:]):
         # Casting required as the default is tf.int32 and tf.int64 is required
         choice_ds.extend([tf.cast(i + 1, tf.int64)] * ds.cardinality().numpy())
+
     choice_ds = tf.data.Dataset.from_tensor_slices(choice_ds)
 
     # Make a text-only dataset (without labels), then call adapt
@@ -116,5 +149,5 @@ if __name__ == '__main__':
 
     # Only consider entries that have been labelled
     mask = (coding != '-') & (coding != '+')
-    mask_ds = np.ma.masked_array(array_ds, mask)
-    mask_code = np.ma.masked_array(coding, mask)
+    mask_ds = preprocess_text_ds(np.ma.masked_array(array_ds, mask).compressed())
+    mask_code = np.ma.masked_array(coding, mask).compressed()
