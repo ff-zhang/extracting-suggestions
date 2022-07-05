@@ -82,7 +82,7 @@ if __name__ == '__main__':
     import yaml
 
     from preprocessing import import_multiple_excel, ds_from_ndarray, create_vectorize_layer, \
-    preprocess_text_ds, vectorize_dataset
+    preprocess_text_ds, vectorize_ds
 
     with open('settings.yaml', 'r') as f:
         env_vars = yaml.safe_load(f)
@@ -105,7 +105,7 @@ if __name__ == '__main__':
     vectorize_layer = create_vectorize_layer(ds_list)
 
     # Vectorize the training, validation, and test datasets
-    train_vec_ds, val_vec_ds, test_vec_ds = vectorize_dataset(vectorize_layer, *ds_list, **params)
+    train_vec_ds, val_vec_ds, test_vec_ds = vectorize_ds(vectorize_layer, *ds_list, **params)
 
     targets, contexts, labels = generate_training_data(
         sequences=train_vec_ds.map(lambda x, y: x),
@@ -142,8 +142,8 @@ if __name__ == '__main__':
     weights = word2vec.get_layer('w2v_embedding').get_weights()[0]
     vocab = vectorize_layer.get_vocabulary()
 
-    out_v = io.open('logs/vectors.tsv', 'w', encoding='utf-8')
-    out_m = io.open('logs/metadata.tsv', 'w', encoding='utf-8')
+    out_v = io.open('models/vectors.tsv', 'w', encoding='utf-8')
+    out_m = io.open('models/metadata.tsv', 'w', encoding='utf-8')
 
     for index, word in enumerate(vocab):
         if index == 0:

@@ -4,9 +4,11 @@ from typing import Union
 import win32com.client
 import yaml
 
-import nltk
 import sklearn.model_selection
+
+import nltk
 import numpy as np
+
 import tensorflow as tf
 
 
@@ -130,8 +132,32 @@ def create_vectorize_layer(*ds_list: tuple[tf.data.Dataset], **params):
     return vectorize_layer
 
 
-def vectorize_dataset(vectorize_layer: tf.keras.layers.TextVectorization, *args, **params):
-    return [text_ds.prefetch(eval(params['AUTOTUNE'])).map(lambda x, y: (vectorize_layer(tf.expand_dims(x, -1)), y)).unbatch() for text_ds in args]
+def vectorize_ds(vectorize_layer: tf.keras.layers.TextVectorization, *args, **params):
+    return [text_ds.map(lambda x, y: (vectorize_layer(tf.expand_dims(x, -1)), y)) for text_ds in args]
+
+
+def normalize_ds(ds: tf.data.Dataset):
+    norm = tf.keras.layers.Normalization()
+    norm_ds = ds.map(lambda x, y: x)
+    norm.adapt(norm_ds)
+
+    return ds.map(lambda x, y: (norm(x), y))
+
+
+def ds_to_ndarray(vec_ds):
+    # x, y = np.empty(0), np.empty(0)
+    x, y = [], []
+
+    for x_tensor, y_tensor in vec_ds.unbatch():
+        # x = np.concatenate((x, x_tensor.numpy()))
+        # y = np.concatenate((y, y_tensor.numpy()))
+        x.append(x_tensor.numpy())
+        y.append(y_tensor.numpy())
+
+    x = np.squeeze(np.asarray(x))
+    y = np.squeeze(np.asarray(y))
+
+    return x, y
 
 
 if __name__ == '__main__':
@@ -151,3 +177,12 @@ if __name__ == '__main__':
     mask = (coding != '-') & (coding != '+')
     mask_ds = preprocess_text_ds(np.ma.masked_array(array_ds, mask).compressed())
     mask_code = np.ma.masked_array(coding, mask).compressed()
+
+    print('Converting data into vectorized Tensorflow dataset')
+    # Creates the dataset in Tensorflow
+    ds = tf.data.Dataset.from_tensor_slices((mask_ds, mask_code)).batch(params['BATCH_SIZE'], drop_remainder=True)
+    vectorize_layer = create_vectorize_layer(ds)
+
+    # Vectorize the dataset
+    vec_ds = vectorize_ds(vectorize_layer, ds, **params)[0]
+    norm_vec_ds = normalize_ds(ds)

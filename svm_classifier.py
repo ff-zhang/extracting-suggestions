@@ -11,34 +11,26 @@ from skopt.space import Real, Categorical, Integer
 from joblib import parallel_backend
 
 
-def ds_to_ndarray(vec_ds):
-    # x, y = np.empty(0), np.empty(0)
-    x, y = [], []
-
-    for x_tensor, y_tensor in vec_ds.unbatch():
-        # x = np.concatenate((x, x_tensor.numpy()))
-        # y = np.concatenate((y, y_tensor.numpy()))
-        x.append(x_tensor.numpy())
-        y.append(y_tensor.numpy())
-
-    x = np.squeeze(np.asarray(x))
-    y = np.squeeze(np.asarray(y))
-
-    return x, y
-
-
 def train_svm(vec_ds: tf.data.Dataset, **params):
     x, y = ds_to_ndarray(vec_ds)
 
     clf = make_pipeline(
-        sklearn.preprocessing.StandardScaler(),
+        # sklearn.preprocessing.StandardScaler(),
+
         # values and model taken from optimize_hyperparameters
-        sklearn.svm.SVC(
-            C=1708.7949461869523,
-            kernel='rbf',
-            degree=6,
-            gamma=8.514453273694237,
-            class_weight='balanced'
+        # sklearn.svm.SVC(
+        #     C=1708.7949461869523,
+        #     kernel='rbf',
+        #     degree=6,
+        #     gamma=8.514453273694237,
+        #     class_weight='balanced'
+        # )
+        sklearn.svm.LinearSVC(
+            # convergent value: 11.245184667895169
+            C=23694.157784623574,
+            class_weight='balanced',
+            max_iter=1000000000,
+            verbose=True
         )
     )
 
@@ -66,33 +58,35 @@ def train_svm(vec_ds: tf.data.Dataset, **params):
     print(f'{recall} \nAverage recall: {sum(recall) / len(recall)} \n')
     print(f'{f1} \nAverage F1 score: {sum(f1) / len(f1)}')
 
+    return clf
+
 
 def optimize_hyperparameters(vec_ds, **params):
     # pipeline class is used as estimator to enable
     # search over different model types
     pipe = sklearn.pipeline.Pipeline([
-        ('model', sklearn.svm.SVC())
+        ('model', sklearn.svm.SVC(class_weight='balanced'))
     ])
 
     linsvc_search = {
-        'model': Categorical([sklearn.svm.LinearSVC(max_iter=100000)]),
-        'model__C': Real(1e-6, 1e+6, 'log-uniform'),
+        'model': Categorical([sklearn.svm.LinearSVC(max_iter=1000000, verbose=3)]),
+        'model__C': Real(1e-6, 1e+18, 'log-uniform'),
     }
     svc_search = {
         'model': Categorical([sklearn.svm.SVC()]),
-        'model__C': Real(1e-6, 1e+6, 'log-uniform'),
-        'model__gamma': Real(1e-6, 1e+1, 'log-uniform'),
-        # 'model__degree': Integer(1, 8), # only impacts polynomial kernels
-        # Polynomial kernel excluded as it results in 'ValueError: The dual coefficients or intercepts are not finite.'
-        'model__kernel': Categorical(['rbf', 'sigmoid']), # 'poly'
+        'model__C': Real(1e-6, 1e+18, 'log-uniform'),
+        'model__gamma': Real(1e-18, 1e+6, 'log-uniform'),
+        # 'model__degree': Integer(1, 8),  # only impacts polynomial kernels
+        'model__kernel': Categorical(['rbf', 'sigmoid']),  # 'poly'
     }
 
     opt = skopt.BayesSearchCV(
         pipe,
         [(svc_search, 50), (linsvc_search, 50)],
-        cv=params['NUM_FOLDS'],
+        n_iter=500,
         scoring='f1',
-        n_jobs=3,
+        n_jobs=6,
+        cv=params['NUM_FOLDS'],
         verbose=3
     )
 
@@ -108,8 +102,8 @@ if __name__ == '__main__':
     import yaml
     import pathlib
 
-    from preprocessing import import_multiple_excel, create_vectorize_layer, normalize_ds, \
-        preprocess_text_ds, vectorize_ds
+    from preprocessing import ds_to_ndarray, import_multiple_excel, create_vectorize_layer, \
+        normalize_ds, preprocess_text_ds, vectorize_ds
 
     with open('settings.yaml', 'r') as f:
         env_vars = yaml.safe_load(f)
