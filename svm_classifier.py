@@ -10,7 +10,7 @@ from skopt.space import Real, Categorical, Integer
 
 from joblib import parallel_backend
 
-from preprocessing import load_ds, normalize_ds
+from preprocessing import ds_to_ndarray, load_ds, normalize_ds
 
 
 def train_svm(vec_ds: tf.data.Dataset, **params):
