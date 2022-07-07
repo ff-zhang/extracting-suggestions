@@ -3,9 +3,9 @@ import math
 import numpy as np
 
 import tensorflow as tf
-from keras.layers import Embedding
+from tensorflow.python.keras.layers import Embedding
 
-from gensim.models import KeyedVectors
+import gensim.downloader
 
 import tqdm
 
@@ -111,9 +111,9 @@ def gensim_to_keras_embedding(model: str = 'word2vec-google-news-300', train_emb
         Embedding layer, to be used as input to deeper network layers.
 
     """
-    keyed_vectors = KeyedVectors.load_word2vec_format(model,binary=True)
-    weights = keyed_vectors.vectors  # vectors themselves, a 2D numpy array
-    index_to_key = keyed_vectors.index_to_key  # which row in `weights` corresponds to which word?
+    word2vec_vectors = gensim.downloader.load(model)
+    weights = word2vec_vectors.vectors  # vectors themselves, a 2D numpy array
+    index_to_key = word2vec_vectors.index_to_key  # which row in `weights` corresponds to which word
 
     layer = Embedding(
         input_dim=weights.shape[0],
@@ -121,15 +121,14 @@ def gensim_to_keras_embedding(model: str = 'word2vec-google-news-300', train_emb
         weights=[weights],
         trainable=train_embeddings,
     )
+
     return layer
 
 
 if __name__ == '__main__':
-    import pathlib
     import yaml
 
-    from preprocessing import import_multiple_excel, ds_from_ndarray, create_vectorize_layer, \
-    preprocess_text_ds, vectorize_ds
+    from preprocessing import load_ds
 
     with open('settings.yaml', 'r') as f:
         env_vars = yaml.safe_load(f)
@@ -137,26 +136,10 @@ if __name__ == '__main__':
         settings = env_vars['SETTINGS']
         params = env_vars['PARAMETERS']
 
-    data_dir = pathlib.Path().resolve() / settings['DATA_DIR']
-    files = [data_dir / f for f in ('SALG-Instrument-78901-2.xlsx', 'SALG-Instrument-92396.xlsx')]
-
-    text_ds, code_ds = import_multiple_excel(files, 'matter22', [(1, 1)] * 2, [(89, 15), (353, 18)], [(6, 7), (5, 6)])
-
-    # Only consider entries that have been labelled
-    mask = (code_ds != '-') & (code_ds != '+')
-    mask_ds = preprocess_text_ds(np.ma.masked_array(text_ds, mask).compressed())
-    mask_code = np.ma.masked_array(code_ds, mask).compressed()
-    mask_code = np.asarray(list(int(i == '+') for i in mask_code))
-
-    # Creates the training, testing, and validation datasets
-    ds_list = ds_from_ndarray(mask_ds, mask_code, **params)
-    vectorize_layer = create_vectorize_layer(ds_list, max_tokens=2000)
-
-    # Vectorize the training, validation, and test datasets
-    train_vec_ds, val_vec_ds, test_vec_ds = vectorize_ds(vectorize_layer, *ds_list, **params)
+    vectorize_layer, vec_ds_list = load_ds(settings['DATA_DIR'], get_layer=True, **params)
 
     targets, contexts, labels = generate_training_data(
-        sequences=train_vec_ds.map(lambda x, y: x),
+        sequences=vec_ds_list[0].map(lambda x, y: x),  # only use training dataset
         window_size=2,
         num_ns=4,
         vocab_size=vectorize_layer.vocabulary_size(),
@@ -185,4 +168,6 @@ if __name__ == '__main__':
     tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir="logs")
     word2vec.fit(dataset, epochs=20, callbacks=[tensorboard_callback])
 
-    word2vec.save()
+    word2vec.save(vectorize_layer)
+
+    model = gensim_to_keras_embedding()

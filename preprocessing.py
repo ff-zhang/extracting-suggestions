@@ -128,8 +128,8 @@ def vectorize_ds(vectorize_layer: tf.keras.layers.TextVectorization, *args, **pa
     return [text_ds.map(lambda x, y: (vectorize_layer(tf.expand_dims(x, -1)), y)) for text_ds in args]
 
 
-def load_ds(**params):
-    data_dir = pathlib.Path().resolve() / settings['DATA_DIR']
+def load_ds(ds_dir: str, get_layer: bool = False, **params):
+    data_dir = pathlib.Path().resolve() / ds_dir
     files = [data_dir / f for f in ('SALG-Instrument-78901-2.xlsx', 'SALG-Instrument-92396.xlsx')]
 
     text_ds, code_ds = import_multiple_excel(files, 'matter22', [(1, 1)] * 2, [(89, 15), (353, 18)], [(6, 7), (5, 6)])
@@ -144,10 +144,13 @@ def load_ds(**params):
     ds_list = ds_from_ndarray(mask_ds, mask_code, **params)
 
     # Vectorize the training, validation, and test datasets
-    vectorize_layer = create_vectorize_layer(ds_list[0], max_tokens=2000) # only done with test datset
+    vectorize_layer = create_vectorize_layer(ds_list, max_tokens=2000)
     train_vec_ds, val_vec_ds, test_vec_ds = vectorize_ds(vectorize_layer, *ds_list, **params)
 
-    return train_vec_ds, val_vec_ds, test_vec_ds
+    if get_layer:
+        return vectorize_layer, (train_vec_ds, val_vec_ds, test_vec_ds)
+    else:
+        return train_vec_ds, val_vec_ds, test_vec_ds
 
 
 def normalize_ds(ds: tf.data.Dataset):
@@ -198,5 +201,5 @@ if __name__ == '__main__':
     vectorize_layer = create_vectorize_layer(ds)
 
     # Vectorize the dataset
-    vec_ds = load_ds()
+    vec_ds = load_ds(settings['DATA_DIR'])
     norm_vec_ds = normalize_ds(ds)
