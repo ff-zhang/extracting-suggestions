@@ -1,8 +1,15 @@
 import math
 
 import numpy as np
+
 import tensorflow as tf
+from keras.layers import Embedding
+
+from gensim.models import KeyedVectors
+
 import tqdm
+
+import io
 
 
 # Based off of Word2Vec model from Google: https://www.tensorflow.org/tutorials/text/word2vec
@@ -27,6 +34,24 @@ class Word2Vec(tf.keras.Model):
         dots = tf.einsum('be,bce->bc', word_emb, context_emb)
         # dots: (batch, context)
         return dots
+
+    def save(self, vectorize_layer: tf.keras.layers.TextVectorization):
+        weights = self.get_layer('w2v_embedding').get_weights()[0]
+        vocab = vectorize_layer.get_vocabulary()
+
+        out_v = io.open('models/vectors.tsv', 'w', encoding='utf-8')
+        out_m = io.open('models/metadata.tsv', 'w', encoding='utf-8')
+
+        for index, word in enumerate(vocab):
+            if index == 0:
+                continue  # skip 0, it's padding.
+
+            vec = weights[index]
+            out_v.write('\t'.join([str(x) for x in vec]) + "\n")
+            out_m.write(word + "\n")
+
+        out_v.close()
+        out_m.close()
 
 
 # Generates skip-gram pairs with negative sampling for a list of sequences  (int-encoded sentences)
@@ -77,6 +102,28 @@ def generate_training_data(sequences, window_size, num_ns, vocab_size, seed):
     return targets, contexts, labels
 
 
+def gensim_to_keras_embedding(model: str = 'word2vec-google-news-300', train_embeddings: bool = False):
+    """Get a Keras 'Embedding' layer with weights set from Word2Vec model's learned word embeddings.
+
+    Returns
+    -------
+    `keras.layers.Embedding`
+        Embedding layer, to be used as input to deeper network layers.
+
+    """
+    keyed_vectors = KeyedVectors.load_word2vec_format(model,binary=True)
+    weights = keyed_vectors.vectors  # vectors themselves, a 2D numpy array
+    index_to_key = keyed_vectors.index_to_key  # which row in `weights` corresponds to which word?
+
+    layer = Embedding(
+        input_dim=weights.shape[0],
+        output_dim=weights.shape[1],
+        weights=[weights],
+        trainable=train_embeddings,
+    )
+    return layer
+
+
 if __name__ == '__main__':
     import pathlib
     import yaml
@@ -99,10 +146,11 @@ if __name__ == '__main__':
     mask = (code_ds != '-') & (code_ds != '+')
     mask_ds = preprocess_text_ds(np.ma.masked_array(text_ds, mask).compressed())
     mask_code = np.ma.masked_array(code_ds, mask).compressed()
+    mask_code = np.asarray(list(int(i == '+') for i in mask_code))
 
     # Creates the training, testing, and validation datasets
     ds_list = ds_from_ndarray(mask_ds, mask_code, **params)
-    vectorize_layer = create_vectorize_layer(ds_list)
+    vectorize_layer = create_vectorize_layer(ds_list, max_tokens=2000)
 
     # Vectorize the training, validation, and test datasets
     train_vec_ds, val_vec_ds, test_vec_ds = vectorize_ds(vectorize_layer, *ds_list, **params)
@@ -137,21 +185,4 @@ if __name__ == '__main__':
     tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir="logs")
     word2vec.fit(dataset, epochs=20, callbacks=[tensorboard_callback])
 
-    import io
-
-    weights = word2vec.get_layer('w2v_embedding').get_weights()[0]
-    vocab = vectorize_layer.get_vocabulary()
-
-    out_v = io.open('models/vectors.tsv', 'w', encoding='utf-8')
-    out_m = io.open('models/metadata.tsv', 'w', encoding='utf-8')
-
-    for index, word in enumerate(vocab):
-        if index == 0:
-            continue  # skip 0, it's padding.
-
-        vec = weights[index]
-        out_v.write('\t'.join([str(x) for x in vec]) + "\n")
-        out_m.write(word + "\n")
-
-    out_v.close()
-    out_m.close()
+    word2vec.save()

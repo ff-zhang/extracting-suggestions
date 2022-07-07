@@ -98,18 +98,10 @@ def kfold_ds_from_ndarray(x: np.ndarray, y: np.ndarray, num_split: int):
     return tf.data.Dataset.from_generator(_gen, output_signature=())
 
 
-def create_vectorize_layer(*ds_list: tuple[tf.data.Dataset], **params):
-    # Combines a list of datasets into one
-    def _concatenate_ds(ds_list: tuple[tf.data.Dataset]):
-        ds0 = tf.data.Dataset.from_tensors(ds_list[0])
-        for ds1 in ds_list[1:]:
-            ds0 = ds0.concatenate(tf.data.Dataset.from_tensors(ds1))
-
-        return ds0
-
+def create_vectorize_layer(ds_list: tuple[tf.data.Dataset], max_tokens: int = None, **params):
     # Text vectorization layer
     vectorize_layer = tf.keras.layers.TextVectorization(
-        max_tokens=None,
+        max_tokens=max_tokens,
         standardize=None,
         split=None,
         output_mode='int',
@@ -134,6 +126,28 @@ def create_vectorize_layer(*ds_list: tuple[tf.data.Dataset], **params):
 
 def vectorize_ds(vectorize_layer: tf.keras.layers.TextVectorization, *args, **params):
     return [text_ds.map(lambda x, y: (vectorize_layer(tf.expand_dims(x, -1)), y)) for text_ds in args]
+
+
+def load_ds(**params):
+    data_dir = pathlib.Path().resolve() / settings['DATA_DIR']
+    files = [data_dir / f for f in ('SALG-Instrument-78901-2.xlsx', 'SALG-Instrument-92396.xlsx')]
+
+    text_ds, code_ds = import_multiple_excel(files, 'matter22', [(1, 1)] * 2, [(89, 15), (353, 18)], [(6, 7), (5, 6)])
+
+    # Only consider entries that have been labelled
+    mask = (code_ds != '-') & (code_ds != '+')
+    mask_ds = preprocess_text_ds(np.ma.masked_array(text_ds, mask).compressed())
+    mask_code = np.ma.masked_array(code_ds, mask).compressed()
+    mask_code = np.asarray(list(int(i == '+') for i in mask_code))
+
+    # Creates the training, testing, and validation datasets
+    ds_list = ds_from_ndarray(mask_ds, mask_code, **params)
+
+    # Vectorize the training, validation, and test datasets
+    vectorize_layer = create_vectorize_layer(ds_list[0], max_tokens=2000) # only done with test datset
+    train_vec_ds, val_vec_ds, test_vec_ds = vectorize_ds(vectorize_layer, *ds_list, **params)
+
+    return train_vec_ds, val_vec_ds, test_vec_ds
 
 
 def normalize_ds(ds: tf.data.Dataset):
@@ -184,5 +198,5 @@ if __name__ == '__main__':
     vectorize_layer = create_vectorize_layer(ds)
 
     # Vectorize the dataset
-    vec_ds = vectorize_ds(vectorize_layer, ds, **params)[0]
+    vec_ds = load_ds()
     norm_vec_ds = normalize_ds(ds)

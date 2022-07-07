@@ -4,9 +4,11 @@ import yaml
 import numpy as np
 import tensorflow as tf
 
-from preprocessing import ds_from_ndarray, import_multiple_excel, create_vectorize_layer, \
-    kfold_ds_from_ndarray, preprocess_text_ds, vectorize_dataset
+from preprocessing import load_ds, normalize_ds
 from svm_classifier import train_svm
+
+import joblib
+
 if __name__ == '__main__':
     # hyperparameters from Reddy et al. (2021)
     # epochs = 10
@@ -24,27 +26,10 @@ if __name__ == '__main__':
         settings = env_vars['SETTINGS']
         params = env_vars['PARAMETERS']
 
-    data_dir = pathlib.Path().resolve() / settings['DATA_DIR']
-    files = [data_dir / f for f in ('SALG-Instrument-78901-2.xlsx', 'SALG-Instrument-92396.xlsx')]
+    vec_ds = load_ds(**params)[0]
+    norm_vec_ds = normalize_ds(vec_ds)
 
-    print('Importing raw text data and labeling')
-    text_ds, code_ds = import_multiple_excel(files, 'matter22', [(1, 1)] * 2, [(89, 15), (353, 18)], [(6, 7), (5, 6)])
+    print('Optimizing SVM classifier')
+    clf = train_svm(vec_ds, **params)
 
-    print('Converting data into a numpy array')
-    # Only consider entries that have been labelled
-    mask = (code_ds != '-') & (code_ds != '+')
-    mask_ds = preprocess_text_ds(np.ma.masked_array(text_ds, mask).compressed())
-    mask_code = np.ma.masked_array(code_ds, mask).compressed()
-    mask_code = np.asarray(list(int(i == '+') for i in mask_code))
-
-    print('Converting data into vectorized Tensorflow dataset')
-    # Creates the dataset in Tensorflow
-    ds = tf.data.Dataset.from_tensor_slices((mask_ds, mask_code)).batch(params['BATCH_SIZE'], drop_remainder=True)
-    vectorize_layer = create_vectorize_layer(ds)
-
-    # Vectorize the dataset
-    vec_ds = vectorize_dataset(vectorize_layer, ds, **params)[0]
-
-    print('Training SVM classifier')
-    train_svm(vec_ds, **params)
-
+    joblib.dump(clf, 'models/svc.joblib')
