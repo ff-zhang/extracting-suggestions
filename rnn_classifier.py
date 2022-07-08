@@ -41,3 +41,4 @@ if __name__ == '__main__':
     print('Test Loss:', test_loss)
     print('Test Accuracy:', test_acc)
 
+    model.save('models/rnn')

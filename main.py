@@ -1,8 +1,4 @@
-import pathlib
 import yaml
-
-import numpy as np
-import tensorflow as tf
 
 from preprocessing import load_vec_ds, normalize_ds
 from svm_classifier import train_svm
