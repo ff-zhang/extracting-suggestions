@@ -4,7 +4,7 @@ import yaml
 import numpy as np
 import tensorflow as tf
 
-from preprocessing import load_ds, normalize_ds
+from preprocessing import load_vec_ds, normalize_ds
 from svm_classifier import train_svm
 
 import joblib
@@ -26,7 +26,7 @@ if __name__ == '__main__':
         settings = env_vars['SETTINGS']
         params = env_vars['PARAMETERS']
 
-    vec_ds = load_ds(settings['DATA_DIR'], **params)[0]
+    vec_ds = load_vec_ds(settings['DATA_DIR'], **params)[0]
     norm_vec_ds = normalize_ds(vec_ds)
 
     print('Optimizing SVM classifier')

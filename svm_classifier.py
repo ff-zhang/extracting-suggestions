@@ -10,7 +10,7 @@ from skopt.space import Real, Categorical, Integer
 
 from joblib import parallel_backend
 
-from preprocessing import ds_to_ndarray, load_ds, normalize_ds
+from preprocessing import ds_to_ndarray, load_vec_ds, normalize_ds
 
 
 def train_svm(vec_ds: tf.data.Dataset, **params):
@@ -107,7 +107,7 @@ if __name__ == '__main__':
         settings = env_vars['SETTINGS']
         params = env_vars['PARAMETERS']
 
-    vec_ds = load_ds(settings['DATA_DIR'], **params)[0]
+    vec_ds = load_vec_ds(settings['DATA_DIR'], **params)[0]
     norm_vec_ds = normalize_ds(vec_ds)
 
     print('Optimizing SVM classifier')

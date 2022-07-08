@@ -125,7 +125,13 @@ def create_vectorize_layer(ds_list: tuple[tf.data.Dataset], max_tokens: int = No
 
 
 def vectorize_ds(vectorize_layer: tf.keras.layers.TextVectorization, *args, **params):
-    return [text_ds.map(lambda x, y: (vectorize_layer(tf.expand_dims(x, -1)), y)) for text_ds in args]
+    ds_list = []
+
+    for text_ds in args:
+        text_ds.map(lambda x, y: (vectorize_layer(tf.expand_dims(x, -1)), y))
+        ds_list.append(text_ds)
+
+    return ds_list
 
 
 def load_ds(ds_dir: str, get_layer: bool = False, **params):
@@ -145,6 +151,16 @@ def load_ds(ds_dir: str, get_layer: bool = False, **params):
 
     # Vectorize the training, validation, and test datasets
     vectorize_layer = create_vectorize_layer(ds_list, max_tokens=2000)
+
+    if get_layer:
+        return vectorize_layer, ds_list
+    else:
+        return ds_list
+
+
+def load_vec_ds(ds_dir: str, get_layer: bool = False, **params):
+    vectorize_layer, ds_list = load_ds(ds_dir, True, **params)
+
     train_vec_ds, val_vec_ds, test_vec_ds = vectorize_ds(vectorize_layer, *ds_list, **params)
 
     if get_layer:
@@ -201,5 +217,5 @@ if __name__ == '__main__':
     vectorize_layer = create_vectorize_layer(ds)
 
     # Vectorize the dataset
-    vec_ds = load_ds(settings['DATA_DIR'])
+    vec_ds = load_vec_ds(settings['DATA_DIR'])
     norm_vec_ds = normalize_ds(ds)
