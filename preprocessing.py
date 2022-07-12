@@ -134,32 +134,38 @@ def vectorize_ds(vectorize_layer: tf.keras.layers.TextVectorization, *args, **pa
     return ds_list
 
 
-def load_ds(ds_dir: str, get_layer: bool = False, **params):
+def load_ds(ds_dir: str, is_xlsx: bool = True, **params):
     data_dir = pathlib.Path().resolve() / ds_dir
-    files = [data_dir / f for f in ('SALG-Instrument-78901-2.xlsx', 'SALG-Instrument-92396.xlsx')]
 
-    text_ds, code_ds = import_multiple_excel(files, 'matter22', [(1, 1)] * 2, [(89, 15), (353, 18)], [(6, 7), (5, 6)])
+    if is_xlsx:
+        files = [data_dir / f for f in ('SALG-Instrument-78901-2.xlsx', 'SALG-Instrument-92396.xlsx')]
 
-    # Only consider entries that have been labelled
-    mask = (code_ds != '-') & (code_ds != '+')
-    mask_ds = preprocess_text_ds(np.ma.masked_array(text_ds, mask).compressed())
-    mask_code = np.ma.masked_array(code_ds, mask).compressed()
-    mask_code = np.asarray(list(int(i == '+') for i in mask_code))
+        text_ds, code_ds = import_multiple_excel(files, 'matter22', [(1, 1)] * 2, [(89, 15), (353, 18)], [(6, 7), (5, 6)])
 
-    # Creates the training, testing, and validation datasets
-    ds_list = ds_from_ndarray(mask_ds, mask_code, **params)
+        # Only consider entries that have been labelled
+        mask = (code_ds != '-') & (code_ds != '+')
+        mask_ds = preprocess_text_ds(np.ma.masked_array(text_ds, mask).compressed())
+        mask_code = np.ma.masked_array(code_ds, mask).compressed()
+        mask_code = np.asarray(list(int(i == '+') for i in mask_code))
+
+        # Creates the training, testing, and validation datasets
+        ds_list = ds_from_ndarray(mask_ds, mask_code, **params)
+
+    # loading model saved using tf.data.experimental.load()
+    else:
+        ds_list = []
+        for dir in ['test', 'validation', 'train']:
+            ds = tf.data.experimental.load((data_dir / dir).as_posix())
+            ds_list.append(ds)
+
+    return ds_list
+
+
+def load_vec_ds(ds_dir: str, get_layer: bool = False, is_xlsx: bool = True, **params):
+    ds_list = load_ds(ds_dir, is_xlsx=is_xlsx, **params)
 
     # Vectorize the training, validation, and test datasets
-    vectorize_layer = create_vectorize_layer(ds_list, max_tokens=2000)
-
-    if get_layer:
-        return vectorize_layer, ds_list
-    else:
-        return ds_list
-
-
-def load_vec_ds(ds_dir: str, get_layer: bool = False, **params):
-    vectorize_layer, ds_list = load_ds(ds_dir, True, **params)
+    vectorize_layer = create_vectorize_layer(ds_list, max_tokens=params['MAX_TOKENS'])
 
     train_vec_ds, val_vec_ds, test_vec_ds = vectorize_ds(vectorize_layer, *ds_list, **params)
 
@@ -201,21 +207,13 @@ if __name__ == '__main__':
         params = env_vars['PARAMETERS']
 
     data_dir = pathlib.Path().resolve() / settings['DATA_DIR']
-    file_name = data_dir / 'SALG-Instrument-78901-2.xlsx'
 
-    array_ds = import_excel(file_name, settings['PASSWORD'], (1, 1), (89, 15), sheet=6).flatten()
-    coding = import_excel(file_name, settings['PASSWORD'], (1, 1), (89, 15), sheet=7).flatten()
+    # Load the dataset in Tensorflow
+    train_ds, val_ds, test_ds = load_ds('data', is_xlsx=False, **params)
+    train_ds, val_ds, test_ds = load_vec_ds('data', is_xlsx=False, **params)
 
-    # Only consider entries that have been labelled
-    mask = (coding != '-') & (coding != '+')
-    mask_ds = preprocess_text_ds(np.ma.masked_array(array_ds, mask).compressed())
-    mask_code = np.ma.masked_array(coding, mask).compressed()
-
-    print('Converting data into vectorized Tensorflow dataset')
-    # Creates the dataset in Tensorflow
-    ds = tf.data.Dataset.from_tensor_slices((mask_ds, mask_code)).batch(params['BATCH_SIZE'], drop_remainder=True)
-    vectorize_layer = create_vectorize_layer(ds)
-
-    # Vectorize the dataset
-    vec_ds = load_vec_ds(settings['DATA_DIR'])
-    norm_vec_ds = normalize_ds(ds)
+    # Save the dataset to a file
+    # save_dir = pathlib.Path().resolve() / 'data'
+    # tf.data.experimental.save(train_ds, (save_dir / 'train').as_posix())  # as_posix() for Windows
+    # tf.data.experimental.save(val_ds, (save_dir / 'validation').as_posix())
+    # tf.data.experimental.save(test_ds, (save_dir / 'test').as_posix())

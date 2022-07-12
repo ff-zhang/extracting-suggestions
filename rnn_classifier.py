@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from preprocessing import load_ds
+from preprocessing import create_vectorize_layer, load_ds
 from text_embedding import gensim_to_keras_embedding
 
 
@@ -33,7 +33,8 @@ if __name__ == '__main__':
         settings = env_vars['SETTINGS']
         params = env_vars['PARAMETERS']
 
-    vectorize_layer, ds_list = load_ds(settings['DATA_DIR'], get_layer=True, **params)
+    ds_list = load_ds(settings['DATA_DIR'], **params)
+    vectorize_layer = create_vectorize_layer(ds_list, max_tokens=params['MAX_TOKENS'])
     model = train_rnn(vectorize_layer, ds_list[0], ds_list[1])
 
     test_loss, test_acc = model.evaluate(ds_list[2])
