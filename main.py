@@ -1,26 +1,10 @@
-import yaml
-
-from preprocessing import load_vec_ds, normalize_ds
+from preprocessing import load_env_vars, load_vec_ds, normalize_ds
 from svm_classifier import train_svm
 
 import joblib
 
 if __name__ == '__main__':
-    # hyperparameters from Reddy et al. (2021)
-    # epochs = 10
-    # v_size = 200
-    # dropout = 0.5
-    # rec_dropout = 0.4
-    # max_seq_length = 1200
-    # num_layers = 3
-    # num_attrs = 200
-    # act_func = nn.Tanh()
-
-    with open('settings.yaml', 'r') as f:
-        env_vars = yaml.safe_load(f)
-
-        settings = env_vars['SETTINGS']
-        params = env_vars['PARAMETERS']
+    settings, params = load_env_vars()
 
     vec_ds = load_vec_ds(settings['DATA_DIR'], **params)[0]
     norm_vec_ds = normalize_ds(vec_ds)

@@ -11,7 +11,7 @@ import skopt
 from skopt.space import Categorical, Real
 
 
-from preprocessing import ds_to_ndarray, load_vec_ds, normalize_ds
+from preprocessing import ds_to_ndarray, load_env_vars, load_vec_ds, normalize_ds
 
 
 def train_nb_classifier(vec_ds: tf.data.Dataset, **params):
@@ -80,13 +80,7 @@ def optimize_hyperparameters(vec_ds: tf.data.Dataset, **params):
 
 
 if __name__ == '__main__':
-    import yaml
-
-    with open('settings.yaml', 'r') as f:
-        env_vars = yaml.safe_load(f)
-
-        settings = env_vars['SETTINGS']
-        params = env_vars['PARAMETERS']
+    settings, params = load_env_vars()
 
     vec_ds = load_vec_ds(settings['DATA_DIR'], **params)[0]
     norm_vec_ds = normalize_ds(vec_ds)

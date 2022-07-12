@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from preprocessing import create_vectorize_layer, load_ds
+from preprocessing import create_vectorize_layer, load_ds, load_env_vars
 from text_embedding import gensim_to_keras_embedding
 
 
@@ -25,16 +25,7 @@ def train_rnn(vectorize_layer: tf.keras.layers.TextVectorization, train_ds: tf.d
 
 
 if __name__ == '__main__':
-    import yaml
-    import pathlib
-
-    dir = pathlib.Path().resolve()
-
-    with open(dir / 'settings.yaml', 'r') as f:
-        env_vars = yaml.safe_load(f)
-
-        settings = env_vars['SETTINGS']
-        params = env_vars['PARAMETERS']
+    settings, params = load_env_vars()
 
     ds_list = load_ds(settings['DATA_DIR'], is_xlsx=False, **params)
     vectorize_layer = create_vectorize_layer(ds_list, max_tokens=params['MAX_TOKENS'])

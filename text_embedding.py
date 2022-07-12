@@ -125,15 +125,9 @@ def gensim_to_keras_embedding(model: str = 'word2vec-google-news-300', train_emb
 
 
 if __name__ == '__main__':
-    import yaml
+    from preprocessing import load_env_vars, load_vec_ds
 
-    from preprocessing import load_vec_ds
-
-    with open('settings.yaml', 'r') as f:
-        env_vars = yaml.safe_load(f)
-
-        settings = env_vars['SETTINGS']
-        params = env_vars['PARAMETERS']
+    settings, params = load_env_vars()
 
     vectorize_layer, vec_ds_list = load_vec_ds(settings['DATA_DIR'], get_layer=True, **params)
 

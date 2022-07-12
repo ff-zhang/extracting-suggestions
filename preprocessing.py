@@ -1,7 +1,6 @@
+import yaml
 import pathlib
 from typing import Union
-
-import yaml
 
 import sklearn.model_selection
 
@@ -9,6 +8,18 @@ import nltk
 import numpy as np
 
 import tensorflow as tf
+
+
+def load_env_vars(file_name: str = 'settings.yaml'):
+    cur_dir = pathlib.Path(__file__).parent.resolve()
+
+    with open(cur_dir / file_name, 'r') as f:
+        env_vars = yaml.safe_load(f)
+
+        settings = env_vars['SETTINGS']
+        params = env_vars['PARAMETERS']
+
+    return settings, params
 
 
 def import_excel(file: pathlib.Path, password: str, start_cell: tuple[int, int],
@@ -136,7 +147,7 @@ def vectorize_ds(vectorize_layer: tf.keras.layers.TextVectorization, *args, **pa
 
 
 def load_ds(ds_dir: str, is_xlsx: bool = True, **params):
-    data_dir = pathlib.Path().resolve() / ds_dir
+    data_dir = pathlib.Path(__file__).parent.resolve() / ds_dir
 
     if is_xlsx:
         files = [data_dir / f for f in ('SALG-Instrument-78901-2.xlsx', 'SALG-Instrument-92396.xlsx')]
@@ -201,13 +212,9 @@ def ds_to_ndarray(vec_ds):
 
 
 if __name__ == '__main__':
-    with open('settings.yaml', 'r') as f:
-        env_vars = yaml.safe_load(f)
+    settings, params = load_env_vars()
 
-        settings = env_vars['SETTINGS']
-        params = env_vars['PARAMETERS']
-
-    data_dir = pathlib.Path().resolve() / settings['DATA_DIR']
+    data_dir = pathlib.Path(__file__).parent.resolve() / settings['DATA_DIR']
 
     # Load the dataset in Tensorflow
     train_ds, val_ds, test_ds = load_ds('data', is_xlsx=False, **params)
