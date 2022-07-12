@@ -26,14 +26,17 @@ def train_rnn(vectorize_layer: tf.keras.layers.TextVectorization, train_ds: tf.d
 
 if __name__ == '__main__':
     import yaml
+    import pathlib
 
-    with open('settings.yaml', 'r') as f:
+    dir = pathlib.Path().resolve()
+
+    with open(dir / 'settings.yaml', 'r') as f:
         env_vars = yaml.safe_load(f)
 
         settings = env_vars['SETTINGS']
         params = env_vars['PARAMETERS']
 
-    ds_list = load_ds(settings['DATA_DIR'], **params)
+    ds_list = load_ds(settings['DATA_DIR'], is_xlsx=False, **params)
     vectorize_layer = create_vectorize_layer(ds_list, max_tokens=params['MAX_TOKENS'])
     model = train_rnn(vectorize_layer, ds_list[0], ds_list[1])
 
