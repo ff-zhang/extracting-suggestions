@@ -140,8 +140,8 @@ def vectorize_ds(vectorize_layer: tf.keras.layers.TextVectorization, *args, **pa
     ds_list = []
 
     for text_ds in args:
-        text_ds.map(lambda x, y: (vectorize_layer(tf.expand_dims(x, -1)), y))
-        ds_list.append(text_ds)
+        vec_ds = text_ds.map(lambda x, y: (vectorize_layer(tf.expand_dims(x, -1)), y))
+        ds_list.append(vec_ds)
 
     return ds_list
 
@@ -179,12 +179,12 @@ def load_vec_ds(ds_dir: str, get_layer: bool = False, is_xlsx: bool = True, **pa
     # Vectorize the training, validation, and test datasets
     vectorize_layer = create_vectorize_layer(ds_list, max_tokens=params['MAX_TOKENS'])
 
-    train_vec_ds, val_vec_ds, test_vec_ds = vectorize_ds(vectorize_layer, *ds_list, **params)
+    vec_ds_list = vectorize_ds(vectorize_layer, *ds_list, **params)
 
     if get_layer:
-        return vectorize_layer, (train_vec_ds, val_vec_ds, test_vec_ds)
+        return vectorize_layer, vec_ds_list
     else:
-        return train_vec_ds, val_vec_ds, test_vec_ds
+        return vec_ds_list
 
 
 def normalize_ds(ds: tf.data.Dataset):

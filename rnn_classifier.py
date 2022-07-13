@@ -4,7 +4,7 @@ from preprocessing import create_vectorize_layer, load_ds, load_env_vars, load_v
 from text_embedding import load_word2vec
 
 
-def train_rnn(train_ds: tf.data.Dataset, test_ds: tf.data.Dataset, model_dir: str, **params):
+def train_rnn(train_ds: tf.data.Dataset, val_ds: tf.data.Dataset, model_dir: str, **params):
     word2vec = load_word2vec(model_dir, **params)
 
     model = tf.keras.Sequential([
@@ -16,14 +16,16 @@ def train_rnn(train_ds: tf.data.Dataset, test_ds: tf.data.Dataset, model_dir: st
         tf.keras.layers.Dropout(0.5),
         tf.keras.layers.Dense(1)
     ])
-    # model.add(vectorize_layer)
     model.summary()
 
     model.compile(loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
                   optimizer=tf.keras.optimizers.Adam(1e-4),
-                  metrics=[tf.keras.metrics.Recall(), tf.keras.metrics.Precision()])
+                  # metrics=[tf.keras.metrics.Recall(), tf.keras.metrics.Precision()])
+                  metrics=['accuracy'])
 
-    return model.fit(train_ds, epochs=10, validation_data=test_ds, validation_steps=30)
+    model.fit(train_ds, epochs=10, validation_data=val_ds, validation_steps=30)
+
+    return model
 
 
 if __name__ == '__main__':
@@ -39,5 +41,7 @@ if __name__ == '__main__':
 
     print('Test Loss:', test_loss)
     print('Test Accuracy:', test_acc)
+    # print('Test Recall:', test_recall)
+    # print('Test Precision:', test_precision)
 
     model.save('models/rnn')
