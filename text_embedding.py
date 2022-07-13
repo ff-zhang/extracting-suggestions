@@ -2,12 +2,9 @@ import math
 import pathlib
 
 import numpy as np
-
 import tensorflow as tf
-from gensim.models import KeyedVectors
-from tensorflow.python.keras.layers import Embedding
 
-import gensim.downloader
+from gensim.models import KeyedVectors
 
 import tqdm
 import io
@@ -103,7 +100,7 @@ def generate_training_data(sequences, window_size, num_ns, vocab_size, seed):
     return targets, contexts, labels
 
 
-def gensim_to_keras_embedding(model_dir: str, model_file: str = 'word2vec-google-news-300.gz'):
+def load_word2vec(model_dir: str, model_file: str = 'word2vec-google-news-300.gz', **params):
     """Get a Keras 'Embedding' layer with weights set from Word2Vec model's learned word embeddings.
 
     Returns
@@ -113,15 +110,16 @@ def gensim_to_keras_embedding(model_dir: str, model_file: str = 'word2vec-google
 
     """
     model_path = pathlib.Path(__file__).parent.resolve() / model_dir
-    word2vec_vectors = KeyedVectors.load_word2vec_format((model_path / model_file).as_posix(), binary=True)
+    word2vec_vectors = KeyedVectors.load_word2vec_format((model_path / model_file).as_posix(), binary=True, limit=params['VOCAB_LIMIT'])
     weights = word2vec_vectors.vectors  # vectors themselves, a 2D numpy array
     index_to_key = word2vec_vectors.index_to_key  # which row in `weights` corresponds to which word
 
-    layer = Embedding(
+    layer = tf.keras.layers.Embedding(
         input_dim=weights.shape[0],
         output_dim=weights.shape[1],
         weights=[weights],
         trainable=False,
+        name='word2vec'
     )
 
     return layer
@@ -166,4 +164,4 @@ if __name__ == '__main__':
 
     word2vec.save(vectorize_layer)
 
-    model = gensim_to_keras_embedding(settings['MODEL_DIR'])
+    model = load_word2vec(settings['MODEL_DIR'])
