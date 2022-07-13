@@ -17,6 +17,8 @@ def load_env_vars(file_name: str = 'settings.yaml'):
         env_vars = yaml.safe_load(f)
 
         settings = env_vars['SETTINGS']
+        settings['BASE_DIR'] = cur_dir
+
         params = env_vars['PARAMETERS']
 
     return settings, params
@@ -146,9 +148,7 @@ def vectorize_ds(vectorize_layer: tf.keras.layers.TextVectorization, *args, **pa
     return ds_list
 
 
-def load_ds(ds_dir: str, is_xlsx: bool = True, **params):
-    data_dir = pathlib.Path(__file__).parent.resolve() / ds_dir
-
+def load_ds(data_dir: pathlib.Path, is_xlsx: bool = True, **params):
     if is_xlsx:
         files = [data_dir / f for f in ('SALG-Instrument-78901-2.xlsx', 'SALG-Instrument-92396.xlsx')]
 
@@ -173,7 +173,7 @@ def load_ds(ds_dir: str, is_xlsx: bool = True, **params):
     return ds_list
 
 
-def load_vec_ds(ds_dir: str, get_layer: bool = False, is_xlsx: bool = True, **params):
+def load_vec_ds(ds_dir: pathlib.Path, get_layer: bool = False, is_xlsx: bool = True, **params):
     ds_list = load_ds(ds_dir, is_xlsx=is_xlsx, **params)
 
     # Vectorize the training, validation, and test datasets
@@ -214,11 +214,11 @@ def ds_to_ndarray(vec_ds):
 if __name__ == '__main__':
     settings, params = load_env_vars()
 
-    data_dir = pathlib.Path(__file__).parent.resolve() / settings['DATA_DIR']
+    data_dir = settings['CUR_DIR'] / settings['DATA_DIR']
 
     # Load the dataset in Tensorflow
-    train_ds, val_ds, test_ds = load_ds('data', is_xlsx=False, **params)
-    train_ds, val_ds, test_ds = load_vec_ds('data', is_xlsx=False, **params)
+    train_ds, val_ds, test_ds = load_ds(settings['BASE_DIR'] / 'data', is_xlsx=False, **params)
+    train_ds, val_ds, test_ds = load_vec_ds(settings['CUR_DIR'] / 'data', is_xlsx=False, **params)
 
     # Save the dataset to a file
     # save_dir = pathlib.Path().resolve() / 'data'

@@ -32,7 +32,7 @@ if __name__ == '__main__':
     settings, params = load_env_vars()
 
     print('Loading vectorized dataset')
-    ds_list = load_vec_ds(settings['DATA_DIR'], is_xlsx=False, **params)
+    ds_list = load_vec_ds(settings['CUR_DIR'] / settings['DATA_DIR'], is_xlsx=False, **params)
 
     print('Training RNN')
     model = train_rnn(ds_list[0], ds_list[1], settings['MODEL_DIR'], **params)
@@ -44,4 +44,5 @@ if __name__ == '__main__':
     # print('Test Recall:', test_recall)
     # print('Test Precision:', test_precision)
 
-    model.save('models/rnn')
+    model_dir = settings['CUR_DIR'] / settings['MODEL_DIR']
+    model.save((model_dir / 'rnn').as_posix())

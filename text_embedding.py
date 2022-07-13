@@ -109,7 +109,7 @@ def load_word2vec(model_dir: str, model_file: str = 'word2vec-google-news-300.gz
         Embedding layer, to be used as input to deeper network layers.
 
     """
-    model_path = pathlib.Path(__file__).parent.resolve() / model_dir
+    model_path = settings['CUR_DIR'] / model_dir
     word2vec_vectors = KeyedVectors.load_word2vec_format((model_path / model_file).as_posix(), binary=True, limit=params['VOCAB_LIMIT'])
     weights = word2vec_vectors.vectors  # vectors themselves, a 2D numpy array
     index_to_key = word2vec_vectors.index_to_key  # which row in `weights` corresponds to which word
@@ -130,7 +130,8 @@ if __name__ == '__main__':
 
     settings, params = load_env_vars()
 
-    vectorize_layer, vec_ds_list = load_vec_ds(settings['DATA_DIR'], get_layer=True, **params)
+    vectorize_layer, vec_ds_list = load_vec_ds(settings['CUR_DIR'] / settings['DATA_DIR'],
+                                               get_layer=True, **params)
 
     targets, contexts, labels = generate_training_data(
         sequences=vec_ds_list[0].map(lambda x, y: x),  # only use training dataset
