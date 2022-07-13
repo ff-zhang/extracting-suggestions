@@ -26,7 +26,7 @@ def import_excel(file: pathlib.Path, password: str, start_cell: tuple[int, int],
                  end_cell: tuple[int, int], sheet: int = 1, cols: list[int] = None):
     import win32com.client
 
-    xlApp = win32com.client.Dispatch("Excel.Application")
+    xlApp = win32com.client.Dispatch('Excel.Application')
 
     # https://docs.microsoft.com/en-ca/office/vba/api/Excel.Workbooks
     xlwb = xlApp.Workbooks.Open(file, False, True, None, password)
