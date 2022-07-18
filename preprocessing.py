@@ -1,12 +1,12 @@
 import yaml
 import pathlib
 from typing import Union
-
-import sklearn.model_selection
+import csv
 
 import nltk
 import numpy as np
 
+import sklearn.model_selection
 import tensorflow as tf
 
 
@@ -36,7 +36,7 @@ def import_excel(file: pathlib.Path, password: str, start_cell: tuple[int, int],
     # https://docs.microsoft.com/en-ca/office/vba/api/excel.worksheet
     xlws = xlwb.Sheets(sheet)
 
-    return np.array(xlws.Range(xlws.Cells(*start_cell), xlws.Cells(*end_cell)).Value)[:, cols]
+    return np.array(xlws.Range(xlws.Cells(*start_cell), xlws.Cells(*end_cell)).Value, dtype='str')[:, cols]
 
 
 def import_multiple_excel(files: list[pathlib.Path], password: str, starts: list[tuple],
@@ -60,6 +60,21 @@ def import_multiple_excel(files: list[pathlib.Path], password: str, starts: list
         code_ds = np.concatenate((code_ds, f_code_ds.flatten()))
 
     return text_ds, code_ds
+
+
+def sentence_tokenize(text_ds: np.ndarray):
+    sentences = []
+
+    for text in np.nditer(text_ds, flags=['buffered']):
+        # Replaces undefined tokens with the empty string
+        sentences.extend((sent.replace(u'\uFFFD', '') for sent in nltk.sent_tokenize(str(text))))
+
+    # ensures there are enough entries for np.reshape()
+    sentences.extend((text_ds.shape[-1] - len(sentences) % text_ds.shape[-1]) * [''])
+    a = np.asarray(sentences).reshape(len(sentences) // text_ds.shape[-1], text_ds.shape[-1])
+
+    with open('text.csv', 'w', newline='') as f:
+        csv.writer(f).writerows(a)
 
 
 def preprocess_text_ds(text_ds: np.ndarray):
@@ -156,6 +171,7 @@ def load_ds(data_dir: pathlib.Path, is_xlsx: bool = True, **params):
 
         # Only consider entries that have been labelled
         mask = (code_ds != '-') & (code_ds != '+')
+        # np.ma.compressed() turns the array into a column vector
         mask_ds = preprocess_text_ds(np.ma.masked_array(text_ds, mask).compressed())
         mask_code = np.ma.masked_array(code_ds, mask).compressed()
         mask_code = np.asarray(list(int(i == '+') for i in mask_code))
@@ -214,14 +230,18 @@ def ds_to_ndarray(vec_ds):
 if __name__ == '__main__':
     settings, params = load_env_vars()
 
-    data_dir = settings['CUR_DIR'] / settings['DATA_DIR']
-
-    # Load the dataset in Tensorflow
-    train_ds, val_ds, test_ds = load_ds(settings['BASE_DIR'] / 'data', is_xlsx=False, **params)
-    train_ds, val_ds, test_ds = load_vec_ds(settings['CUR_DIR'] / 'data', is_xlsx=False, **params)
+    # data_dir = settings['BASE_DIR'] / settings['DATA_DIR']
+    #
+    # # Load the dataset in Tensorflow
+    # train_ds, val_ds, test_ds = load_ds(data_dir, is_xlsx=False, **params)
+    # train_ds, val_ds, test_ds = load_vec_ds(data_dir, is_xlsx=False, **params)
 
     # Save the dataset to a file
     # save_dir = pathlib.Path().resolve() / 'data'
     # tf.data.experimental.save(train_ds, (save_dir / 'train').as_posix())  # as_posix() for Windows
     # tf.data.experimental.save(val_ds, (save_dir / 'validation').as_posix())
     # tf.data.experimental.save(test_ds, (save_dir / 'test').as_posix())
+
+    ds = import_excel(
+        settings['BASE_DIR'] / '.salg' / 'SALG-Instrument-87824.xlsx', 'matter22', (1, 1), (78, 15), sheet=6
+    )

@@ -100,7 +100,7 @@ def generate_training_data(sequences, window_size, num_ns, vocab_size, seed):
     return targets, contexts, labels
 
 
-def load_word2vec(model_dir: str, model_file: str = 'word2vec-google-news-300.gz', **params):
+def load_word2vec(model_dir: pathlib.Path, model_file: str = 'word2vec-google-news-300.gz', **params):
     """Get a Keras 'Embedding' layer with weights set from Word2Vec model's learned word embeddings.
 
     Returns
@@ -109,8 +109,7 @@ def load_word2vec(model_dir: str, model_file: str = 'word2vec-google-news-300.gz
         Embedding layer, to be used as input to deeper network layers.
 
     """
-    model_path = settings['CUR_DIR'] / model_dir
-    word2vec_vectors = KeyedVectors.load_word2vec_format((model_path / model_file).as_posix(), binary=True, limit=params['VOCAB_LIMIT'])
+    word2vec_vectors = KeyedVectors.load_word2vec_format((model_dir / model_file).as_posix(), binary=True, limit=params['VOCAB_LIMIT'])
     weights = word2vec_vectors.vectors  # vectors themselves, a 2D numpy array
     index_to_key = word2vec_vectors.index_to_key  # which row in `weights` corresponds to which word
 
