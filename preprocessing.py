@@ -230,18 +230,14 @@ def ds_to_ndarray(vec_ds):
 if __name__ == '__main__':
     settings, params = load_env_vars()
 
-    # data_dir = settings['BASE_DIR'] / settings['DATA_DIR']
-    #
+    data_dir = settings['BASE_DIR'] / settings['DATA_DIR']
+
     # # Load the dataset in Tensorflow
-    # train_ds, val_ds, test_ds = load_ds(data_dir, is_xlsx=False, **params)
+    train_ds, val_ds, test_ds = load_ds(settings['BASE_DIR'] / '.salg', is_xlsx=True, **params)
     # train_ds, val_ds, test_ds = load_vec_ds(data_dir, is_xlsx=False, **params)
 
     # Save the dataset to a file
-    # save_dir = pathlib.Path().resolve() / 'data'
-    # tf.data.experimental.save(train_ds, (save_dir / 'train').as_posix())  # as_posix() for Windows
-    # tf.data.experimental.save(val_ds, (save_dir / 'validation').as_posix())
-    # tf.data.experimental.save(test_ds, (save_dir / 'test').as_posix())
-
-    ds = import_excel(
-        settings['BASE_DIR'] / '.salg' / 'SALG-Instrument-87824.xlsx', 'matter22', (1, 1), (78, 15), sheet=6
-    )
+    save_dir = settings['BASE_DIR'] / 'data'
+    tf.data.experimental.save(train_ds, (save_dir / 'train').as_posix())  # as_posix() for Windows
+    tf.data.experimental.save(val_ds, (save_dir / 'validation').as_posix())
+    tf.data.experimental.save(test_ds, (save_dir / 'test').as_posix())
