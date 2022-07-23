@@ -39,7 +39,7 @@ def train_rnn(train_ds: tf.data.Dataset, val_ds: tf.data.Dataset, model_dir: pat
                       # tfa.metrics.F1Score(num_classes=1)
                   ])
 
-    history = model.fit(train_ds, epochs=params['EPOCHS'], validation_data=val_ds)
+    history = model.fit(train_ds, epochs=hparams['EPOCHS'], validation_data=val_ds)
 
     return model, history
 
@@ -54,7 +54,8 @@ def optimize_hyperparameters(ds_list: list[tf.data.Dataset], model_dir: pathlib.
         'ACTIVATION': ['sigmoid', 'softmax'],
         'OPTIMIZER': ['adam', 'adagrad'],
         'LEARNING_RATE': [1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8],
-        'EPSILON': [1e-0, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8]
+        'EPSILON': [1e-0, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8],
+        'EPOCHS': [100, 500, 1000],
     }
 
     w2v = load_word2vec(model_dir, **params)
