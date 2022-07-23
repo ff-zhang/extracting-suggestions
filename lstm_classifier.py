@@ -9,8 +9,9 @@ from text_embedding import load_word2vec
 
 
 def train_rnn(train_ds: tf.data.Dataset, val_ds: tf.data.Dataset, model_dir: pathlib.Path,
-              hparams: dict, **params):
-    word2vec = load_word2vec(model_dir, **params)
+              hparams: dict, word2vec=None, **params):
+    if not word2vec:
+        word2vec = load_word2vec(model_dir, **params)
 
     model = tf.keras.Sequential()
     model.add(word2vec)
@@ -33,8 +34,8 @@ def train_rnn(train_ds: tf.data.Dataset, val_ds: tf.data.Dataset, model_dir: pat
                   optimizer=optimizer,
                   metrics=[
                       'accuracy',  # 'precision', 'recall'
-                      tf.keras.metrics.Precision(),
-                      tf.keras.metrics.Recall(),
+                      tf.keras.metrics.Precision(name='precision'),
+                      tf.keras.metrics.Recall(name='recall'),
                       # tfa.metrics.F1Score(num_classes=1)
                   ])
 
@@ -56,12 +57,14 @@ def optimize_hyperparameters(ds_list: list[tf.data.Dataset], model_dir: pathlib.
         'EPSILON': [1e-0, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8]
     }
 
+    w2v = load_word2vec(model_dir, **params)
+
     for comb in product(*hparams.values()):
         hp = {}
         for i, k in enumerate(hparams.keys()):
             hp[k] = comb[i]
 
-        model, history = train_rnn(ds_list[0], ds_list[1], model_dir, hp, **params)
+        model, history = train_rnn(ds_list[0], ds_list[1], model_dir, hp, word2vec=w2v, **params)
         metrics = model.evaluate(ds_list[2])
         f1 = 0 if metrics[2] * metrics[3] == 0 else (2 * metrics[2] * metrics[3]) / (metrics[2] + metrics[3])
         save_graph(logs_dir / 'graphs' / f'{f1}-{"-".join(map(str, hp.values()))}.png', history)
