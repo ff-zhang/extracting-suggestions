@@ -1,7 +1,6 @@
 import math
 import pathlib
 
-import numpy as np
 import tensorflow as tf
 
 from gensim.models import KeyedVectors
@@ -116,12 +115,12 @@ def load_word2vec(model_dir: pathlib.Path, model_file: str = 'word2vec-google-ne
     layer = tf.keras.layers.Embedding(
         input_dim=weights.shape[0],
         output_dim=weights.shape[1],
-        weights=[weights],
+        # weights=[weights],
         trainable=False,
         name='word2vec'
     )
 
-    return layer
+    return layer, weights
 
 
 if __name__ == '__main__':
@@ -129,39 +128,7 @@ if __name__ == '__main__':
 
     settings, params = load_env_vars()
 
-    vectorize_layer, vec_ds_list = load_vec_ds(settings['CUR_DIR'] / settings['DATA_DIR'],
-                                               get_layer=True, **params)
+    vectorize_layer, vec_ds_list = load_vec_ds(settings['BASE_DIR'] / settings['DATA_DIR'],
+                                               get_layer=True, is_xlsx=False, **params)
 
-    targets, contexts, labels = generate_training_data(
-        sequences=vec_ds_list[0].map(lambda x, y: x),  # only use training dataset
-        window_size=2,
-        num_ns=4,
-        vocab_size=vectorize_layer.vocabulary_size(),
-        seed=params['SEED']
-    )
-
-    targets = np.array(targets)
-    contexts = np.array(contexts)[:, :, 0]
-    labels = np.array(labels)
-
-    print('\n')
-    print(f"targets.shape: {targets.shape}")
-    print(f"contexts.shape: {contexts.shape}")
-    print(f"labels.shape: {labels.shape}")
-
-    dataset = tf.data.Dataset.from_tensor_slices(((targets, contexts), labels))
-    dataset = dataset.shuffle(params['BUFFER_SIZE']).batch(params['BATCH_SIZE'], drop_remainder=True)
-
-    dataset = dataset.cache().prefetch(buffer_size=eval(params['AUTOTUNE']))
-
-    word2vec = Word2Vec(vectorize_layer.vocabulary_size(), params['EMBEDDING_DIM'])
-    word2vec.compile(optimizer='adam',
-                     loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True),
-                     metrics=['accuracy'])
-
-    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir="logs")
-    word2vec.fit(dataset, epochs=20, callbacks=[tensorboard_callback])
-
-    word2vec.save(vectorize_layer)
-
-    model = load_word2vec(settings['MODEL_DIR'])
+    word2vec, weights = load_word2vec(settings['BASE_DIR'] / settings['MODEL_DIR'], **params)

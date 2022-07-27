@@ -1,25 +1,25 @@
 import os
 import pathlib
-import matplotlib.pyplot as plt
 from itertools import product
 
 import tensorflow as tf
 
-from epoch_model_checkpoint import EpochModelCheckpoint
 from preprocessing import load_env_vars, load_vec_ds
 from text_embedding import load_word2vec
+from epoch_model_checkpoint import EpochModelCheckpoint, save_graph
+from f1_score import F1Score
 
 
-def train_rnn(train_ds: tf.data.Dataset, val_ds: tf.data.Dataset, model_dir: pathlib.Path,
-              logs_dir: pathlib.Path, hparams: dict, word2vec=None, **params):
+def train_rnn(ds_list: list[tf.data.Dataset], model_dir: pathlib.Path, logs_dir: pathlib.Path,
+              hparams: dict, **params):
+    print(hparams)
+
     strategy = tf.distribute.MirroredStrategy()
-
     with strategy.scope():
-        if not word2vec:
-            word2vec = load_word2vec(model_dir, **params)
         model = tf.keras.Sequential()
-        model.add(word2vec)
-        print(hparams)
+        layer, weights = load_word2vec(model_dir, **params)
+        model.add(layer)
+        layer.set_weights = [weights]
         for _ in range(hparams['LSTM_LAYERS'] - 1):
             model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(2 * hparams['LSTM_UNITS'], return_sequences=True)))
         model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(hparams['LSTM_UNITS'])))
@@ -38,27 +38,33 @@ def train_rnn(train_ds: tf.data.Dataset, val_ds: tf.data.Dataset, model_dir: pat
                           'accuracy',  # 'precision', 'recall'
                           tf.keras.metrics.Precision(name='precision'),
                           tf.keras.metrics.Recall(name='recall'),
+                          F1Score(name='f1'),
                       ])
 
     checkpoint_filepath = logs_dir / 'checkpoints' / '-'.join(map(str, hparams.values()))
-    checkpoint_filename = 'cp-{epoch:04d}.ckpt'
+    checkpoint_filename = 'ckpt-{epoch:04d}.ckpt'
     if not os.path.exists(checkpoint_filepath):
         os.mkdir(checkpoint_filepath)
 
     model_checkpoint_callback = EpochModelCheckpoint(
-        filepath=checkpoint_filepath / checkpoint_filename,
-        frequency=50,
+        checkpoints_dir=checkpoint_filepath,
+        file_name=checkpoint_filename,
+        frequency=params['CHECKPOINT_FREQ'],
+        monitor='val_f1',
+        mode='max',
+        save_best_only=True,
+        num_keep=2,
         save_weights_only=True,
-        verbose=1
+        # verbose=1
     )
 
     # Save the weights using the `checkpoint_path` format
     model.save_weights(checkpoint_filepath / checkpoint_filename.format(epoch=0))
 
-    history = model.fit(x=train_ds,
+    history = model.fit(x=ds_list[0],
                         epochs=params['EPOCHS'],
                         # verbose=0,
-                        validation_data=val_ds,
+                        validation_data=ds_list[1],
                         callbacks=[model_checkpoint_callback])
 
     metrics = model.evaluate(ds_list[2])
@@ -78,7 +84,7 @@ def optimize_hyperparameters(ds_list: list[tf.data.Dataset], model_dir: pathlib.
         'ACTIVATION': ['sigmoid'],
         'OPTIMIZER': ['adam'],
         'LEARNING_RATE': [1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8],
-        'EPSILON': [1e-0, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8]
+        'EPSILON': [1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8]
     }
 
     for comb in product(*hparams.values()):
@@ -86,24 +92,8 @@ def optimize_hyperparameters(ds_list: list[tf.data.Dataset], model_dir: pathlib.
         for i, k in enumerate(hparams.keys()):
             hp[k] = comb[i]
 
-        train_rnn(ds_list[0], ds_list[1], model_dir, logs_dir, hp, **params)
-
-
-def save_graph(save_path: pathlib.Path, history: tf.keras.callbacks.History):
-    plt.plot(history.history['loss'], label='loss')
-    plt.plot(history.history['val_loss'], label='val loss')
-    plt.plot(history.history['precision'], label='precision')
-    plt.plot(history.history['val_precision'], label='val precision')
-    plt.plot(history.history['recall'], label='recall')
-    plt.plot(history.history['val_recall'], label='val recall')
-
-    plt.title('Training')
-    plt.ylabel('Value')
-    plt.xlabel('No. epoch')
-    plt.legend(loc="upper left")
-
-    plt.savefig(save_path)
-    plt.close()
+        model, _ = train_rnn(ds_list, model_dir, logs_dir, hp, **params)
+        model.save(model_dir / 'lstm', include_optimizer=False)
 
 
 if __name__ == '__main__':
