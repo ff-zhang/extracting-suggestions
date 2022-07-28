@@ -17,6 +17,7 @@ def train_rnn(ds_list: list[tf.data.Dataset], model_dir: pathlib.Path, logs_dir:
     strategy = tf.distribute.MirroredStrategy()
     with strategy.scope():
         model = tf.keras.Sequential()
+        model.add(tf.keras.layers.Input(shape=(None,)))
         layer, weights = load_word2vec(model_dir, **params)
         model.add(layer)
         layer.set_weights = [weights]
