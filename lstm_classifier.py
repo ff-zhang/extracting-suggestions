@@ -26,12 +26,9 @@ def train_rnn(ds_list: list[tf.data.Dataset], model_dir: pathlib.Path, logs_dir:
         model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(hparams['LSTM_UNITS'])))
         model.add(tf.keras.layers.Dense(hparams['DENSE_UNITS'], activation='tanh'))
         model.add(tf.keras.layers.Dropout(hparams['DROPOUT']))
-        model.add(tf.keras.layers.Dense(1, activation=hparams['ACTIVATION']))
+        model.add(tf.keras.layers.Dense(1, activation='sigmoid'))
 
-        if hparams['OPTIMIZER'] == 'adam':
-            optimizer = tf.keras.optimizers.Adam(learning_rate=hparams['LEARNING_RATE'], epsilon=hparams['EPSILON'])
-        elif hparams['OPTIMIZER'] == 'adagrad':
-            optimizer = tf.keras.optimizers.Adagrad(learning_rate=hparams['LEARNING_RATE'], epsilon=hparams['EPSILON'])
+        optimizer = tf.keras.optimizers.Adam(learning_rate=hparams['LEARNING_RATE'], epsilon=hparams['EPSILON'])
 
         model.compile(loss=tf.keras.losses.BinaryCrossentropy(),
                       optimizer=optimizer,
@@ -80,11 +77,9 @@ def optimize_hyperparameters(ds_list: list[tf.data.Dataset], model_dir: pathlib.
     hparams = {
         'LSTM_LAYERS': [1, 2],
         'LSTM_UNITS': [16, 32, 64],
-        'DENSE_UNITS': [4, 8, 16, 32, 64],
-        'DROPOUT': [0.1, 0.2, 0.3, 0.4, 0.5],
-        'ACTIVATION': ['sigmoid'],
-        'OPTIMIZER': ['adam'],
-        'LEARNING_RATE': [1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8],
+        'DENSE_UNITS': [4, 8, 16, 32],
+        'DROPOUT': [0.1, 0.3, 0.5],
+        'LEARNING_RATE': [1e-3, 1e-4, 1e-7, 1e-8],
         'EPSILON': [1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8]
     }
 
