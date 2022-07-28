@@ -182,7 +182,7 @@ def load_ds(data_dir: pathlib.Path, is_xlsx: bool = True, prefix: str = '', **pa
     # loading model saved using tf.data.experimental.load()
     else:
         ds_list = []
-        for dir in ['test', 'validation', 'train']:
+        for dir in ['train', 'validation', 'test']:
             ds = tf.data.experimental.load((data_dir / (prefix + dir)).as_posix())
             ds_list.append(ds.batch(params['BATCH_SIZE'], drop_remainder=True))
 
