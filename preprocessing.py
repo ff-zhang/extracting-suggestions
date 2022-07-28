@@ -163,7 +163,7 @@ def vectorize_ds(vectorize_layer: tf.keras.layers.TextVectorization, *args, **pa
     return ds_list
 
 
-def load_ds(data_dir: pathlib.Path, is_xlsx: bool = True, **params):
+def load_ds(data_dir: pathlib.Path, is_xlsx: bool = True, prefix: str = '', **params):
     if is_xlsx:
         files = [data_dir / f for f in ('SALG-Instrument-78901-2.xlsx', 'SALG-Instrument-92396.xlsx')]
 
@@ -183,7 +183,7 @@ def load_ds(data_dir: pathlib.Path, is_xlsx: bool = True, **params):
     else:
         ds_list = []
         for dir in ['test', 'validation', 'train']:
-            ds = tf.data.experimental.load((data_dir / dir).as_posix())
+            ds = tf.data.experimental.load((data_dir / (prefix + dir)).as_posix())
             ds_list.append(ds)
 
     return ds_list
