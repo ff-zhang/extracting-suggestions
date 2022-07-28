@@ -184,7 +184,7 @@ def load_ds(data_dir: pathlib.Path, is_xlsx: bool = True, prefix: str = '', **pa
         ds_list = []
         for dir in ['test', 'validation', 'train']:
             ds = tf.data.experimental.load((data_dir / (prefix + dir)).as_posix())
-            ds_list.append(ds)
+            ds_list.append(ds.batch(params['BATCH_SIZE'], drop_remainder=True))
 
     return ds_list
 
