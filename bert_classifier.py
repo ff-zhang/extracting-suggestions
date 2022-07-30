@@ -163,7 +163,7 @@ def train_bert(ds_list: list[tf.data.Dataset], logs_dir: pathlib.Path, hparams: 
     model = tf.keras.Model(text_input, net, name='bert')
 
     num_train_steps = tf.data.experimental.cardinality(ds_list[0]).numpy() * params['EPOCHS']
-    optimizer = create_optimizer(init_lr=hparams['INIT_LR'], num_train_steps=num_train_steps,
+    optimizer = create_optimizer(init_lr=hparams['INITIAL_LEARNING_RATE'],  num_train_steps=num_train_steps,
                                  num_warmup_steps=int(0.1 * num_train_steps))
 
     model.compile(loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
