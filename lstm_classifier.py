@@ -1,5 +1,6 @@
 import os
 import pathlib
+import argparse
 from itertools import product
 
 import tensorflow as tf
@@ -10,8 +11,8 @@ from epoch_model_checkpoint import EpochModelCheckpoint, save_graph
 from f1_score import F1Score
 
 
-def train_rnn(ds_list: list[tf.data.Dataset], model_dir: pathlib.Path, logs_dir: pathlib.Path,
-              hparams: dict, **params):
+def train_lstm(ds_list: list[tf.data.Dataset], model_dir: pathlib.Path, logs_dir: pathlib.Path,
+               hparams: dict, **params):
     print(hparams)
 
     strategy = tf.distribute.MirroredStrategy()
@@ -53,7 +54,7 @@ def train_rnn(ds_list: list[tf.data.Dataset], model_dir: pathlib.Path, logs_dir:
         save_best_only=True,
         num_keep=2,
         save_weights_only=True,
-        # verbose=1
+        verbose=0
     )
 
     # Save the weights using the `checkpoint_path` format
@@ -61,39 +62,42 @@ def train_rnn(ds_list: list[tf.data.Dataset], model_dir: pathlib.Path, logs_dir:
 
     history = model.fit(x=ds_list[0],
                         epochs=params['EPOCHS'],
-                        # verbose=0,
                         validation_data=ds_list[1],
-                        callbacks=[model_checkpoint_callback])
+                        # callbacks=[model_checkpoint_callback],
+                        verbose=0)
 
     metrics = model.evaluate(ds_list[2])
     f1 = 0 if metrics[2] * metrics[3] == 0 else (2 * metrics[2] * metrics[3]) / (metrics[2] + metrics[3])
-    save_graph(logs_dir / 'graphs' / f'{f1}-{"-".join(map(str, hparams.values()))}.png', history)
+    save_graph(logs_dir / 'graphs' / 'lstm' / f'{f1}-{"-".join(map(str, hparams.values()))}.png', history)
 
     return model, history
 
 
 def optimize_hyperparameters(ds_list: list[tf.data.Dataset], model_dir: pathlib.Path,
-                             logs_dir: pathlib.Path, **params):
-    hparams = {
-        'LSTM_LAYERS': [1, 2],
-        'LSTM_UNITS': [16, 32, 64],
-        'DENSE_UNITS': [4, 8, 16, 32],
-        'DROPOUT': [0.1, 0.3, 0.5],
-        'LEARNING_RATE': [1e-3, 1e-4, 1e-7, 1e-8],
-        'EPSILON': [1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8]
-    }
-
+                             logs_dir: pathlib.Path, hparams: dict, **params):
     for comb in product(*hparams.values()):
         hp = {}
         for i, k in enumerate(hparams.keys()):
             hp[k] = comb[i]
 
-        model, _ = train_rnn(ds_list, model_dir, logs_dir, hp, **params)
-        model.save(model_dir / 'lstm', include_optimizer=False)
+        model, _ = train_lstm(ds_list, model_dir, logs_dir, hp, **params)
+
+
+def get_hyperparameters():
+    parser = argparse.ArgumentParser(description='Test hyperparameter combinations.')
+    parser.add_argument('--lstm-layers', nargs='*', type=int, default=[1, 2])
+    parser.add_argument('--lstm-units', nargs='*', type=int, default=[8, 16, 32, 64])
+    parser.add_argument('--dense-units', nargs='*', type=int, default=[4, 8, 16, 32])
+    parser.add_argument('--dropout', nargs='*', type=float, default=[0.1, 0.2, 0.3, 0.4, 0.5])
+    parser.add_argument('-lr', '--learning-rate', nargs='*', type=float, default=[1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8])
+    parser.add_argument('-e', '--epsilon', nargs='*', type=float, default=[1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8])
+
+    return {k.upper(): v for k, v in vars(parser.parse_args()).items()}
 
 
 if __name__ == '__main__':
     settings, params = load_env_vars()
+    hparams = get_hyperparameters()
 
     print('Loading vectorized dataset')
     ds_list = load_vec_ds(settings['BASE_DIR'] / settings['DATA_DIR'], is_xlsx=False, **params)
@@ -103,4 +107,4 @@ if __name__ == '__main__':
 
     print('Training RNN')
     optimize_hyperparameters(ds_list, settings['BASE_DIR'] / settings['MODEL_DIR'],
-                             settings['BASE_DIR'] / settings['LOGS_DIR'], **params)
+                             settings['BASE_DIR'] / settings['LOGS_DIR'], hparams, **params)

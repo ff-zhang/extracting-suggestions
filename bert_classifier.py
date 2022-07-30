@@ -1,4 +1,6 @@
+import argparse
 import pathlib
+from itertools import product
 
 import tensorflow as tf
 import tensorflow_hub as hub
@@ -10,59 +12,56 @@ from f1_score import F1Score
 from preprocessing import load_ds, load_env_vars
 
 
-bert_model = 'small_bert/bert_en_uncased_L-4_H-512_A-8'
 map_model_to_preprocess = {
     'bert_en_uncased_L-12_H-768_A-12':
         'https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3',
     'bert_en_cased_L-12_H-768_A-12':
         'https://tfhub.dev/tensorflow/bert_en_cased_preprocess/3',
-    'small_bert/bert_en_uncased_L-2_H-128_A-2':
+    'bert_en_uncased_L-2_H-128_A-2':
         'https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3',
-    'small_bert/bert_en_uncased_L-2_H-256_A-4':
+    'bert_en_uncased_L-2_H-256_A-4':
         'https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3',
-    'small_bert/bert_en_uncased_L-2_H-512_A-8':
+    'bert_en_uncased_L-2_H-512_A-8':
         'https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3',
-    'small_bert/bert_en_uncased_L-2_H-768_A-12':
+    'bert_en_uncased_L-2_H-768_A-12':
         'https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3',
-    'small_bert/bert_en_uncased_L-4_H-128_A-2':
+    'bert_en_uncased_L-4_H-128_A-2':
         'https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3',
-    'small_bert/bert_en_uncased_L-4_H-256_A-4':
+    'bert_en_uncased_L-4_H-256_A-4':
         'https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3',
-    'small_bert/bert_en_uncased_L-4_H-512_A-8':
+    'bert_en_uncased_L-4_H-512_A-8':
         'https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3',
-    'small_bert/bert_en_uncased_L-4_H-768_A-12':
+    'bert_en_uncased_L-4_H-768_A-12':
         'https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3',
-    'small_bert/bert_en_uncased_L-6_H-128_A-2':
+    'bert_en_uncased_L-6_H-128_A-2':
         'https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3',
-    'small_bert/bert_en_uncased_L-6_H-256_A-4':
+    'bert_en_uncased_L-6_H-256_A-4':
         'https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3',
-    'small_bert/bert_en_uncased_L-6_H-512_A-8':
+    'bert_en_uncased_L-6_H-512_A-8':
         'https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3',
-    'small_bert/bert_en_uncased_L-6_H-768_A-12':
+    'bert_en_uncased_L-6_H-768_A-12':
         'https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3',
-    'small_bert/bert_en_uncased_L-8_H-128_A-2':
+    'bert_en_uncased_L-8_H-128_A-2':
         'https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3',
-    'small_bert/bert_en_uncased_L-8_H-256_A-4':
+    'bert_en_uncased_L-8_H-256_A-4':
         'https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3',
-    'small_bert/bert_en_uncased_L-8_H-512_A-8':
+    'bert_en_uncased_L-8_H-512_A-8':
         'https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3',
-    'small_bert/bert_en_uncased_L-8_H-768_A-12':
+    'bert_en_uncased_L-8_H-768_A-12':
         'https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3',
-    'small_bert/bert_en_uncased_L-10_H-128_A-2':
+    'bert_en_uncased_L-10_H-128_A-2':
         'https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3',
-    'small_bert/bert_en_uncased_L-10_H-256_A-4':
+    'bert_en_uncased_L-10_H-256_A-4':
         'https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3',
-    'small_bert/bert_en_uncased_L-10_H-512_A-8':
+    'bert_en_uncased_L-10_H-512_A-8':
         'https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3',
-    'small_bert/bert_en_uncased_L-10_H-768_A-12':
+    'bert_en_uncased_L-10_H-768_A-12':
         'https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3',
-    'small_bert/bert_en_uncased_L-12_H-128_A-2':
+    'bert_en_uncased_L-12_H-128_A-2':
         'https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3',
-    'small_bert/bert_en_uncased_L-12_H-256_A-4':
+    'bert_en_uncased_L-12_H-256_A-4':
         'https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3',
-    'small_bert/bert_en_uncased_L-12_H-512_A-8':
-        'https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3',
-    'small_bert/bert_en_uncased_L-12_H-768_A-12':
+    'bert_en_uncased_L-12_H-512_A-8':
         'https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3',
     'bert_multi_cased_L-12_H-768_A-12':
         'https://tfhub.dev/tensorflow/bert_multi_cased_preprocess/3',
@@ -86,54 +85,52 @@ map_name_to_handle = {
         'https://tfhub.dev/tensorflow/bert_en_cased_L-12_H-768_A-12/3',
     'bert_multi_cased_L-12_H-768_A-12':
         'https://tfhub.dev/tensorflow/bert_multi_cased_L-12_H-768_A-12/3',
-    'small_bert/bert_en_uncased_L-2_H-128_A-2':
+    'bert_en_uncased_L-2_H-128_A-2':
         'https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-2_H-128_A-2/1',
-    'small_bert/bert_en_uncased_L-2_H-256_A-4':
+    'bert_en_uncased_L-2_H-256_A-4':
         'https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-2_H-256_A-4/1',
-    'small_bert/bert_en_uncased_L-2_H-512_A-8':
+    'bert_en_uncased_L-2_H-512_A-8':
         'https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-2_H-512_A-8/1',
-    'small_bert/bert_en_uncased_L-2_H-768_A-12':
+    'bert_en_uncased_L-2_H-768_A-12':
         'https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-2_H-768_A-12/1',
-    'small_bert/bert_en_uncased_L-4_H-128_A-2':
+    'bert_en_uncased_L-4_H-128_A-2':
         'https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-4_H-128_A-2/1',
-    'small_bert/bert_en_uncased_L-4_H-256_A-4':
+    'bert_en_uncased_L-4_H-256_A-4':
         'https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-4_H-256_A-4/1',
-    'small_bert/bert_en_uncased_L-4_H-512_A-8':
+    'bert_en_uncased_L-4_H-512_A-8':
         'https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-4_H-512_A-8/1',
-    'small_bert/bert_en_uncased_L-4_H-768_A-12':
+    'bert_en_uncased_L-4_H-768_A-12':
         'https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-4_H-768_A-12/1',
-    'small_bert/bert_en_uncased_L-6_H-128_A-2':
+    'bert_en_uncased_L-6_H-128_A-2':
         'https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-6_H-128_A-2/1',
-    'small_bert/bert_en_uncased_L-6_H-256_A-4':
+    'bert_en_uncased_L-6_H-256_A-4':
         'https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-6_H-256_A-4/1',
-    'small_bert/bert_en_uncased_L-6_H-512_A-8':
+    'bert_en_uncased_L-6_H-512_A-8':
         'https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-6_H-512_A-8/1',
-    'small_bert/bert_en_uncased_L-6_H-768_A-12':
+    'bert_en_uncased_L-6_H-768_A-12':
         'https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-6_H-768_A-12/1',
-    'small_bert/bert_en_uncased_L-8_H-128_A-2':
+    'bert_en_uncased_L-8_H-128_A-2':
         'https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-8_H-128_A-2/1',
-    'small_bert/bert_en_uncased_L-8_H-256_A-4':
+    'bert_en_uncased_L-8_H-256_A-4':
         'https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-8_H-256_A-4/1',
-    'small_bert/bert_en_uncased_L-8_H-512_A-8':
+    'bert_en_uncased_L-8_H-512_A-8':
         'https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-8_H-512_A-8/1',
-    'small_bert/bert_en_uncased_L-8_H-768_A-12':
+    'bert_en_uncased_L-8_H-768_A-12':
         'https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-8_H-768_A-12/1',
-    'small_bert/bert_en_uncased_L-10_H-128_A-2':
+    'bert_en_uncased_L-10_H-128_A-2':
         'https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-10_H-128_A-2/1',
-    'small_bert/bert_en_uncased_L-10_H-256_A-4':
+    'bert_en_uncased_L-10_H-256_A-4':
         'https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-10_H-256_A-4/1',
-    'small_bert/bert_en_uncased_L-10_H-512_A-8':
+    'bert_en_uncased_L-10_H-512_A-8':
         'https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-10_H-512_A-8/1',
-    'small_bert/bert_en_uncased_L-10_H-768_A-12':
+    'bert_en_uncased_L-10_H-768_A-12':
         'https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-10_H-768_A-12/1',
-    'small_bert/bert_en_uncased_L-12_H-128_A-2':
+    'bert_en_uncased_L-12_H-128_A-2':
         'https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-12_H-128_A-2/1',
-    'small_bert/bert_en_uncased_L-12_H-256_A-4':
+    'bert_en_uncased_L-12_H-256_A-4':
         'https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-12_H-256_A-4/1',
-    'small_bert/bert_en_uncased_L-12_H-512_A-8':
+    'bert_en_uncased_L-12_H-512_A-8':
         'https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-12_H-512_A-8/1',
-    'small_bert/bert_en_uncased_L-12_H-768_A-12':
-        'https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-12_H-768_A-12/1',
     'albert_en_base':
         'https://tfhub.dev/tensorflow/albert_en_base/2',
     'electra_small':
@@ -149,29 +146,25 @@ map_name_to_handle = {
 }
 
 
-def train_bert(ds_list: list[tf.data.Dataset], logs_dir: pathlib.Path, **params):
+def train_bert(ds_list: list[tf.data.Dataset], logs_dir: pathlib.Path, hparams: dict, **params):
+    print(hparams)
+
     text_input = tf.keras.layers.Input(shape=(), dtype=tf.string, name='text')
 
-    preprocessing_layer = hub.KerasLayer(map_model_to_preprocess[bert_model], name='preprocessing')
+    preprocessing_layer = hub.KerasLayer(map_model_to_preprocess[hparams['MODEL']], name='preprocessing')
     encoder_inputs = preprocessing_layer(text_input)
-
-    encoder = hub.KerasLayer(map_name_to_handle[bert_model], trainable=True, name='BERT_encoder')
+    encoder = hub.KerasLayer(map_name_to_handle[hparams['MODEL']], trainable=True, name='encoder')
     outputs = encoder(encoder_inputs)
 
     net = outputs['pooled_output']
-    net = tf.keras.layers.Dropout(0.1)(net)
+    net = tf.keras.layers.Dropout(hparams['DROPOUT'])(net)
     net = tf.keras.layers.Dense(1, activation='sigmoid', name='classifier')(net)
 
     model = tf.keras.Model(text_input, net, name='bert')
 
-    model.summary()
-
-    steps_per_epoch = tf.data.experimental.cardinality(ds_list[0]).numpy()
-    num_train_steps = steps_per_epoch * params['EPOCHS']
-    num_warmup_steps = int(0.1 * num_train_steps)
-    init_lr = 3e-5
-    optimizer = create_optimizer(init_lr=init_lr, num_train_steps=num_train_steps,
-                                 num_warmup_steps=num_warmup_steps)
+    num_train_steps = tf.data.experimental.cardinality(ds_list[0]).numpy() * params['EPOCHS']
+    optimizer = create_optimizer(init_lr=hparams['INIT_LR'], num_train_steps=num_train_steps,
+                                 num_warmup_steps=int(0.1 * num_train_steps))
 
     model.compile(loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
                   optimizer=optimizer,
@@ -182,28 +175,48 @@ def train_bert(ds_list: list[tf.data.Dataset], logs_dir: pathlib.Path, **params)
                       F1Score(name='f1'),
                   ])
 
-    history = model.fit(x=ds_list[0], validation_data=ds_list[1], epochs=params['EPOCHS'])
+    history = model.fit(x=ds_list[0],
+                        validation_data=ds_list[1],
+                        epochs=params['EPOCHS'],
+                        verbose=0)
 
     metrics = model.evaluate(ds_list[2])
 
     f1 = 0 if metrics[2] * metrics[3] == 0 else (2 * metrics[2] * metrics[3]) / (metrics[2] + metrics[3])
-    save_graph(logs_dir / 'graphs' / f'bert-{f1}.png', history)
+    save_graph(logs_dir / 'graphs' / 'bert' / f'{f1}-{"-".join(map(str, hparams.values()))}.png', history)
 
     return model, history
 
 
-def optimize_hyperparameters(ds_list: list[tf.data.Dataset]):
-    hparams = {
-        'DROPOUT': [0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
-    }
+def optimize_hyperparameters(ds_list: list[tf.data.Dataset], logs_dir: pathlib.Path, hparams: dict, **params):
+    for comb in product(*hparams.values()):
+        hp = {}
+        for i, k in enumerate(hparams.keys()):
+            hp[k] = comb[i]
+
+        model, _ = train_bert(ds_list, logs_dir, hp, **params)
+
+
+def get_hyperparameters():
+    parser = argparse.ArgumentParser(description='Test hyperparameter combinations.')
+    parser.add_argument('-m', '--model', nargs='*', type=str, default=['bert_en_uncased_L-4_H-512_A-8'])
+    parser.add_argument('--dropout', nargs='*', type=float, default=[0.1, 0.2, 0.3, 0.4, 0.5])
+    parser.add_argument('-init-lr', '--initial-learning-rate', nargs='*', type=float,
+                        default=[3e-2, 3e-3, 3e-4, 3e-5, 3e-6, 3e-7])
+    parser.add_argument('-wp', '--warmup-percentage', nargs='*', type=float, default=[0.1, 0.2])
+
+    return {k.upper(): v for k, v in vars(parser.parse_args()).items()}
 
 
 if __name__ == '__main__':
     settings, params = load_env_vars()
+    hparams = get_hyperparameters()
+
+    print(hparams)
 
     ds_list = load_ds(settings['BASE_DIR'] / settings['DATA_DIR'], is_xlsx=False, prefix='sen_', **params)
     options = tf.data.Options()
     options.experimental_distribute.auto_shard_policy = tf.data.experimental.AutoShardPolicy.DATA
     ds_list = [ds.with_options(options).cache().prefetch(tf.data.AUTOTUNE) for ds in ds_list]
 
-    train_bert(ds_list, settings['BASE_DIR'] / settings['LOGS_DIR'], **params)
+    optimize_hyperparameters(ds_list, settings['BASE_DIR'] / settings['LOGS_DIR'], hparams, **params)

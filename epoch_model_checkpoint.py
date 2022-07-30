@@ -9,6 +9,8 @@ from matplotlib import pyplot as plt
 def save_graph(save_path: pathlib.Path, history: tf.keras.callbacks.History):
     plt.plot(history.history['loss'], label='loss')
     plt.plot(history.history['val_loss'], label='val loss')
+    # plt.plot(history.history['accuracy'], label='accuracy')
+    # plt.plot(history.history['val_accuracy'], label='val accuracy')
     # plt.plot(history.history['precision'], label='precision')
     # plt.plot(history.history['val_precision'], label='val precision')
     # plt.plot(history.history['recall'], label='recall')
@@ -78,7 +80,7 @@ class EpochModelCheckpoint(tf.keras.callbacks.ModelCheckpoint):
             checkpoints = find_checkpoints(self.checkpoints_dir, ascending=False)
 
             to_delete = 0 if self.epoch <= self.frequency * 2 else self.num_keep
-            print('\n' + str(self.epoch) + ' ' + str(self.epochs_since_last_save) + ' ' + str(checkpoints) + '\n')
+            # print('\n' + str(self.epoch) + ' ' + str(self.epochs_since_last_save) + ' ' + str(checkpoints) + '\n')
             for checkpoint in checkpoints[to_delete:]:
                 logger.debug(f'Removing checkpoint {checkpoint}')
                 checkpoint_files = tf.io.gfile.glob(checkpoint + '*')
