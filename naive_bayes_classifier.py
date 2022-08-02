@@ -82,7 +82,7 @@ def optimize_hyperparameters(vec_ds: tf.data.Dataset, **params):
 if __name__ == '__main__':
     settings, params = load_env_vars()
 
-    vec_ds = load_vec_ds(settings['CUR_DIR'] / settings['DATA_DIR'], **params)[0]
+    vec_ds = load_vec_ds(settings['BASE_DIR'] / settings['DATA_DIR'], is_xlsx=False, **params)[0]
     norm_vec_ds = normalize_ds(vec_ds)
 
     print('Optimizing naive Bayes classifier')

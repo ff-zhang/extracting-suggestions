@@ -11,8 +11,8 @@ from epoch_model_checkpoint import EpochModelCheckpoint, save_graph
 from f1_score import F1Score
 
 
-def train_lstm(ds_list: list[tf.data.Dataset], model_dir: pathlib.Path, logs_dir: pathlib.Path,
-               hparams: dict, save_checkpoints: bool = False, **params):
+def train_rnn(ds_list: list[tf.data.Dataset], model_dir: pathlib.Path, logs_dir: pathlib.Path,
+              hparams: dict, save_checkpoints: bool = False, **params):
     print(hparams)
 
     strategy = tf.distribute.MirroredStrategy()
@@ -30,9 +30,10 @@ def train_lstm(ds_list: list[tf.data.Dataset], model_dir: pathlib.Path, logs_dir
                 cell = tf.keras.layers.GRU
             case _:
                 raise AttributeError
-        for _ in range(hparams['LSTM_LAYERS'] - 1):
-            model.add(tf.keras.layers.Bidirectional(cell(2 * hparams['LSTM_UNITS'], return_sequences=True)))
-        model.add(tf.keras.layers.Bidirectional(cell(hparams['LSTM_UNITS'])))
+        for _ in range(hparams[f'{hparams["CELL_TYPE"].upper()}_LAYERS'] - 1):
+            model.add(tf.keras.layers.Bidirectional(cell(2 * hparams[f'{hparams["CELL_TYPE"].upper()}_UNITS'],
+                                                         return_sequences=True)))
+        model.add(tf.keras.layers.Bidirectional(cell(hparams[f'{hparams["CELL_TYPE"].upper()}_UNITS'])))
 
         model.add(tf.keras.layers.Dense(hparams['DENSE_UNITS'], activation='tanh'))
         model.add(tf.keras.layers.Dropout(hparams['DROPOUT']))
@@ -93,7 +94,7 @@ def optimize_hyperparameters(ds_list: list[tf.data.Dataset], model_dir: pathlib.
         for i, k in enumerate(hparams.keys()):
             hp[k] = comb[i]
 
-        model, _ = train_lstm(ds_list, model_dir, logs_dir, hp, **params)
+        model, _ = train_rnn(ds_list, model_dir, logs_dir, hp, **params)
 
 
 def get_hyperparameters():
@@ -132,5 +133,5 @@ if __name__ == '__main__':
     ds_list = [ds.with_options(options) for ds in ds_list]
 
     print('Training RNN')
-    optimize_hyperparameters(ds_list, settings['BASE_DIR'] / settings['MODEL_DIR'],
-                             settings['BASE_DIR'] / settings['LOGS_DIR'], hparams, **params)
+    # optimize_hyperparameters(ds_list, settings['BASE_DIR'] / settings['MODEL_DIR'],
+    #                          settings['BASE_DIR'] / settings['LOGS_DIR'], hparams, **params)
