@@ -127,6 +127,27 @@ def kfold_ds_from_ndarray(x: np.ndarray, y: np.ndarray, num_split: int):
     return tf.data.Dataset.from_generator(_gen, output_signature=())
 
 
+def normalize_ds(ds: tf.data.Dataset):
+    norm = tf.keras.layers.Normalization()
+    norm_ds = ds.map(lambda x, y: x)
+    norm.adapt(norm_ds)
+
+    return ds.map(lambda x, y: (norm(x), y))
+
+
+def ds_to_ndarray(vec_ds):
+    x, y = [], []
+
+    for x_tensor, y_tensor in vec_ds.unbatch():
+        x.extend(x_tensor.numpy())
+        y.extend(y_tensor.numpy())
+
+    x = np.squeeze(np.asarray(x))
+    y = np.squeeze(np.asarray(y))
+
+    return x, y
+
+
 def create_vectorize_layer(ds_list: tuple[tf.data.Dataset], max_tokens: int = None, **params):
     # Text vectorization layer
     vectorize_layer = tf.keras.layers.TextVectorization(
@@ -153,7 +174,7 @@ def create_vectorize_layer(ds_list: tuple[tf.data.Dataset], max_tokens: int = No
     return vectorize_layer
 
 
-def vectorize_ds(vectorize_layer: tf.keras.layers.TextVectorization, *args, **params):
+def vectorize_ds(vectorize_layer: tf.keras.layers.TextVectorization, *args):
     ds_list = []
 
     for text_ds in args:
@@ -163,7 +184,8 @@ def vectorize_ds(vectorize_layer: tf.keras.layers.TextVectorization, *args, **pa
     return ds_list
 
 
-def load_ds(data_dir: pathlib.Path, is_xlsx: bool = True, prefix: str = '', **params):
+def load_ds(data_dir: pathlib.Path, is_xlsx: bool = True, prefix: str = '',
+            ds_types: tuple[str] = ('train', 'validation', 'test'), **params):
     if is_xlsx:
         files = [data_dir / f for f in ('SALG-Instrument-78901-2.xlsx', 'SALG-Instrument-92396.xlsx')]
 
@@ -182,7 +204,7 @@ def load_ds(data_dir: pathlib.Path, is_xlsx: bool = True, prefix: str = '', **pa
     # loading model saved using tf.data.experimental.load()
     else:
         ds_list = []
-        for dir in ['train', 'validation', 'test']:
+        for dir in ds_types:
             ds = tf.data.experimental.load((data_dir / (prefix + dir)).as_posix())
             ds_list.append(ds.batch(params['BATCH_SIZE'], drop_remainder=True))
 
@@ -194,37 +216,12 @@ def load_vec_ds(ds_dir: pathlib.Path, get_layer: bool = False, is_xlsx: bool = T
 
     # Vectorize the training, validation, and test datasets
     vectorize_layer = create_vectorize_layer(ds_list, max_tokens=params['MAX_TOKENS'])
-
-    vec_ds_list = vectorize_ds(vectorize_layer, *ds_list, **params)
+    vec_ds_list = vectorize_ds(vectorize_layer, *ds_list)
 
     if get_layer:
         return vectorize_layer, vec_ds_list
     else:
         return vec_ds_list
-
-
-def normalize_ds(ds: tf.data.Dataset):
-    norm = tf.keras.layers.Normalization()
-    norm_ds = ds.map(lambda x, y: x)
-    norm.adapt(norm_ds)
-
-    return ds.map(lambda x, y: (norm(x), y))
-
-
-def ds_to_ndarray(vec_ds):
-    # x, y = np.empty(0), np.empty(0)
-    x, y = [], []
-
-    for x_tensor, y_tensor in vec_ds.unbatch():
-        # x = np.concatenate((x, x_tensor.numpy()))
-        # y = np.concatenate((y, y_tensor.numpy()))
-        x.append(x_tensor.numpy())
-        y.append(y_tensor.numpy())
-
-    x = np.squeeze(np.asarray(x))
-    y = np.squeeze(np.asarray(y))
-
-    return x, y
 
 
 if __name__ == '__main__':
@@ -237,7 +234,7 @@ if __name__ == '__main__':
     # train_ds, val_ds, test_ds = load_vec_ds(data_dir, is_xlsx=False, **params)
 
     # Save the dataset to a file
-    save_dir = settings['BASE_DIR'] / 'data'
-    tf.data.experimental.save(train_ds, (save_dir / 'train').as_posix())  # as_posix() for Windows
-    tf.data.experimental.save(val_ds, (save_dir / 'validation').as_posix())
-    tf.data.experimental.save(test_ds, (save_dir / 'test').as_posix())
+    save_dir = settings['BASE_DIR'] / settings['DATA_DIR']
+    tf.data.experimental.save(train_ds, (save_dir / 'sk_train').as_posix())  # as_posix() for Windows
+    tf.data.experimental.save(val_ds, (save_dir / 'emb_validation').as_posix())
+    tf.data.experimental.save(test_ds, (save_dir / 'sk_test').as_posix())
