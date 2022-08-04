@@ -4,7 +4,7 @@ from itertools import product
 
 import tensorflow as tf
 import tensorflow_hub as hub
-import tensorflow_text as text
+import tensorflow_text as text  # required for optimizer
 
 from adamw_metric import create_optimizer
 from epoch_model_checkpoint import save_graph
@@ -151,9 +151,9 @@ def train_bert(ds_list: list[tf.data.Dataset], logs_dir: pathlib.Path, hparams: 
 
     text_input = tf.keras.layers.Input(shape=(), dtype=tf.string, name='text')
 
-    preprocessing_layer = hub.KerasLayer(map_model_to_preprocess[hparams['MODEL']], name='preprocessing')
+    preprocessing_layer = hub.KerasLayer(hparams['PREPROCESS_MODEL'], name='preprocessing')
     encoder_inputs = preprocessing_layer(text_input)
-    encoder = hub.KerasLayer(map_name_to_handle[hparams['MODEL']], trainable=True, name='encoder')
+    encoder = hub.KerasLayer(hparams['EMBED_MODEL'], trainable=True, name='encoder')
     outputs = encoder(encoder_inputs)
 
     net = outputs['pooled_output']
@@ -166,7 +166,7 @@ def train_bert(ds_list: list[tf.data.Dataset], logs_dir: pathlib.Path, hparams: 
     optimizer = create_optimizer(init_lr=hparams['INITIAL_LEARNING_RATE'],  num_train_steps=num_train_steps,
                                  num_warmup_steps=int(0.1 * num_train_steps))
 
-    model.compile(loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
+    model.compile(loss=tf.keras.losses.BinaryCrossentropy(),
                   optimizer=optimizer,
                   metrics=[
                       'accuracy',  # 'precision', 'recall'
@@ -197,20 +197,28 @@ def optimize_hyperparameters(ds_list: list[tf.data.Dataset], logs_dir: pathlib.P
         model, _ = train_bert(ds_list, logs_dir, hp, **params)
 
 
-def get_hyperparameters():
+def get_hyperparameters(**settings):
     parser = argparse.ArgumentParser(description='Test hyperparameter combinations.')
-    parser.add_argument('-m', '--model', nargs='*', type=str, default=['bert_en_uncased_L-4_H-512_A-8'])
+    parser.add_argument('--preprocess-model', nargs='*', type=str, default=['bert_en_uncased_L-12_H-768_A-12'])
+    parser.add_argument('--embed-model', nargs='*', type=str, default=['bert_en_uncased_L-12_H-768_A-12'])
     parser.add_argument('--dropout', nargs='*', type=float, default=[0.1, 0.2, 0.3, 0.4, 0.5])
-    parser.add_argument('-init-lr', '--initial-learning-rate', nargs='*', type=float,
-                        default=[3e-2, 3e-3, 3e-4, 3e-5, 3e-6, 3e-7])
-    parser.add_argument('-wp', '--warmup-percentage', nargs='*', type=float, default=[0.1, 0.2])
+    parser.add_argument('conda ', '--initial-learning-rate', nargs='*', type=float,
+                        default=[1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7])
+    parser.add_argument('-wp', '--warmup-percentage', nargs='*', type=float, default=[0.1])
 
-    return {k.upper(): v for k, v in vars(parser.parse_args()).items()}
+    hparams = {k.upper(): v for k, v in vars(parser.parse_args()).items()}
+    dir = settings['BASE_DIR'] / settings['MODEL_DIR']
+    hparams['PREPROCESS_MODEL'] = [(dir / hp[: -7]).as_posix() if hp.endswith('.tar.gz') else
+                                   map_model_to_preprocess[hp] for hp in hparams['PREPROCESS_MODEL']]
+    hparams['EMBED_MODEL'] = [(dir / hp[: -7]).as_posix() if hp.endswith('.tar.gz') else map_name_to_handle[hp]
+                              for hp in hparams['EMBED_MODEL']]
+
+    return hparams
 
 
 if __name__ == '__main__':
     settings, params = load_env_vars()
-    hparams = get_hyperparameters()
+    hparams = get_hyperparameters(**settings)
 
     print(hparams)
 
