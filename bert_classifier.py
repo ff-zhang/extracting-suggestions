@@ -189,8 +189,8 @@ def train_bert(ds_list: list[tf.data.Dataset], logs_dir: pathlib.Path, hparams: 
 
     f1 = 0 if metrics[2] * metrics[3] == 0 else (2 * metrics[2] * metrics[3]) / (metrics[2] + metrics[3])
     dir = logs_dir / 'graphs' / 'bert'
-    save_graph(dir / f'{f1}-{"-".join(map(str, hparams.values()))}.png', history)
-    _save_data(dir / f'{f1}-{"-".join(map(str, hparams.values()))}.txt', model, ds_list[2])
+    save_graph(dir / f'{f1}-{"-".join(map(str, [hparams[k] for k in ["DROPOUT", "INITIAL_LEARNING_RATE"]]))}.png', history)
+    _save_data(dir / f'{f1}-{"-".join(map(str, [hparams[k] for k in ["DROPOUT", "INITIAL_LEARNING_RATE"]]))}.txt', model, ds_list[2])
 
     return model, history
 

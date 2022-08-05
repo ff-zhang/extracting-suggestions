@@ -5,23 +5,27 @@ from itertools import product
 
 import tensorflow as tf
 
-from preprocessing import load_env_vars, load_vec_ds
+from preprocessing import load_ds, load_env_vars, load_vec_ds
 from text_embedding import load_word2vec
 from epoch_model_checkpoint import EpochModelCheckpoint, save_graph
 from f1_score import F1Score
 
 
 def train_rnn(ds_list: list[tf.data.Dataset], model_dir: pathlib.Path, logs_dir: pathlib.Path,
-              hparams: dict, save_checkpoints: bool = False, **params):
+              hparams: dict, save_checkpoints: bool = False, embed: bool = True, **params):
     print(hparams)
 
     strategy = tf.distribute.MirroredStrategy()
     with strategy.scope():
         model = tf.keras.Sequential()
-        model.add(tf.keras.layers.Input(shape=(None,)))
-        layer, weights = load_word2vec(model_dir, **params)
-        model.add(layer)
-        layer.set_weights = [weights]
+        if embed:
+            model.add(tf.keras.layers.Input(shape=(None,)))
+            layer, weights = load_word2vec(model_dir, **params)
+            model.add(layer)
+            layer.set_weights = [weights]
+
+        else:
+            model.add(tf.keras.layers.Input(shape=(None, 1,)))
 
         match hparams['CELL_TYPE']:
             case 'lstm':
@@ -133,5 +137,9 @@ if __name__ == '__main__':
     ds_list = [ds.with_options(options) for ds in ds_list]
 
     print('Training RNN')
+    hp = {'CELL_TYPE': 'gru', 'GRU_LAYERS': 2, 'GRU_UNITS': 64, 'DENSE_UNITS': 32, 'DROPOUT': 0.1,
+          'LEARNING_RATE': 1e-5, 'EPSILON': 1e-7}
+    model, _ = train_rnn(ds_list, settings['BASE_DIR'] / settings['MODEL_DIR'],
+                         settings['BASE_DIR'] / settings['LOGS_DIR'], hp, **params)
     # optimize_hyperparameters(ds_list, settings['BASE_DIR'] / settings['MODEL_DIR'],
     #                          settings['BASE_DIR'] / settings['LOGS_DIR'], hparams, **params)

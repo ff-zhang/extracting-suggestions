@@ -19,7 +19,8 @@ def train_nb_classifier(vec_ds: tf.data.Dataset, **params):
 
     clf = make_pipeline(
         # MultinomialNB(alpha=0.17601196310151052)
-        MultinomialNB(alpha=0.9314472681366592)
+        # MultinomialNB(alpha=0.9314472681366592)
+        MultinomialNB(alpha=0.34518859009142816)
     )
 
     skf = StratifiedKFold(n_splits=params['NUM_FOLDS'])
@@ -88,3 +89,4 @@ if __name__ == '__main__':
 
     print('Optimizing naive Bayes classifier')
     clf = train_nb_classifier(ds_list[0], **params)
+    # optimize_hyperparameters(ds_list[0], **params)

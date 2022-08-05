@@ -176,9 +176,12 @@ def create_vectorize_layer(ds_list: tuple[tf.data.Dataset], max_tokens: int = No
 
 def vectorize_ds(vectorize_layer: tf.keras.layers.TextVectorization, *args):
     ds_list = []
+    # from text_embedding import load_word2vec
 
     for text_ds in args:
         vec_ds = text_ds.map(lambda x, y: (vectorize_layer(tf.expand_dims(x, -1)), y))
+        # word2vec, _ = load_word2vec(settings['BASE_DIR'] / settings['MODEL_DIR'], **params)
+        # emb_ds = vec_ds.map(lambda x, y: (word2vec(x), y))
         ds_list.append(vec_ds)
 
     return ds_list

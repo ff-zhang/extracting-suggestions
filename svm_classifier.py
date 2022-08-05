@@ -29,8 +29,8 @@ def train_svm(vec_ds: tf.data.Dataset, **params):
             # convergent value: 11.245184667895169
             C=23694.157784623574,
             class_weight='balanced',
-            max_iter=1000000000,
-            verbose=True
+            max_iter=1000000,
+            # verbose=True
         )
     )
 
@@ -106,5 +106,5 @@ if __name__ == '__main__':
     norm_vec_ds = normalize_ds(ds_list[0])
 
     print('Optimizing SVM classifier')
-    # train_svm(vec_ds, **params)
-    optimize_hyperparameters(ds_list[0], **params)
+    clf = train_svm(ds_list[0], **params)
+    # optimize_hyperparameters(ds_list[0], **params)
