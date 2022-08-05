@@ -2,6 +2,9 @@ import argparse
 import pathlib
 from itertools import product
 
+import numpy as np
+import sklearn.metrics as metrics
+
 import tensorflow as tf
 import tensorflow_hub as hub
 import tensorflow_text as text  # required for optimizer
@@ -149,31 +152,33 @@ map_name_to_handle = {
 def train_bert(ds_list: list[tf.data.Dataset], logs_dir: pathlib.Path, hparams: dict, **params):
     print(hparams)
 
-    text_input = tf.keras.layers.Input(shape=(), dtype=tf.string, name='text')
+    strategy = tf.distribute.MirroredStrategy()
+    with strategy.scope():
+        text_input = tf.keras.layers.Input(shape=(), dtype=tf.string, name='text')
 
-    preprocessing_layer = hub.KerasLayer(hparams['PREPROCESS_MODEL'], name='preprocessing')
-    encoder_inputs = preprocessing_layer(text_input)
-    encoder = hub.KerasLayer(hparams['EMBED_MODEL'], trainable=True, name='encoder')
-    outputs = encoder(encoder_inputs)
+        preprocessing_layer = hub.KerasLayer(hparams['PREPROCESS_MODEL'], name='preprocessing')
+        encoder_inputs = preprocessing_layer(text_input)
+        encoder = hub.KerasLayer(hparams['EMBED_MODEL'], trainable=True, name='encoder')
+        outputs = encoder(encoder_inputs)
 
-    net = outputs['pooled_output']
-    net = tf.keras.layers.Dropout(hparams['DROPOUT'])(net)
-    net = tf.keras.layers.Dense(1, activation='sigmoid', name='classifier')(net)
+        net = outputs['pooled_output']
+        net = tf.keras.layers.Dropout(hparams['DROPOUT'])(net)
+        net = tf.keras.layers.Dense(1, activation='sigmoid', name='classifier')(net)
 
-    model = tf.keras.Model(text_input, net, name='bert')
+        model = tf.keras.Model(text_input, net, name='bert')
 
-    num_train_steps = tf.data.experimental.cardinality(ds_list[0]).numpy() * params['EPOCHS']
-    optimizer = create_optimizer(init_lr=hparams['INITIAL_LEARNING_RATE'],  num_train_steps=num_train_steps,
-                                 num_warmup_steps=int(0.1 * num_train_steps))
+        num_train_steps = tf.data.experimental.cardinality(ds_list[0]).numpy() * params['EPOCHS']
+        optimizer = create_optimizer(init_lr=hparams['INITIAL_LEARNING_RATE'],  num_train_steps=num_train_steps,
+                                     num_warmup_steps=int(0.1 * num_train_steps))
 
-    model.compile(loss=tf.keras.losses.BinaryCrossentropy(),
-                  optimizer=optimizer,
-                  metrics=[
-                      'accuracy',  # 'precision', 'recall'
-                      tf.keras.metrics.Precision(name='precision'),
-                      tf.keras.metrics.Recall(name='recall'),
-                      F1Score(name='f1'),
-                  ])
+        model.compile(loss=tf.keras.losses.BinaryCrossentropy(),
+                      optimizer=optimizer,
+                      metrics=[
+                          'accuracy',  # 'precision', 'recall'
+                          tf.keras.metrics.Precision(name='precision'),
+                          tf.keras.metrics.Recall(name='recall'),
+                          F1Score(name='f1'),
+                      ])
 
     history = model.fit(x=ds_list[0],
                         validation_data=ds_list[1],
@@ -183,9 +188,21 @@ def train_bert(ds_list: list[tf.data.Dataset], logs_dir: pathlib.Path, hparams: 
     metrics = model.evaluate(ds_list[2])
 
     f1 = 0 if metrics[2] * metrics[3] == 0 else (2 * metrics[2] * metrics[3]) / (metrics[2] + metrics[3])
-    save_graph(logs_dir / 'graphs' / 'bert' / f'{f1}-{"-".join(map(str, hparams.values()))}.png', history)
+    dir = logs_dir / 'graphs' / 'bert'
+    save_graph(dir / f'{f1}-{"-".join(map(str, hparams.values()))}.png', history)
+    _save_data(dir / f'{f1}-{"-".join(map(str, hparams.values()))}.txt', model, ds_list[2])
 
     return model, history
+
+
+def _save_data(save_path: pathlib.Path, model: tf.keras.Model, test_ds: tf.data.Dataset):
+    y = np.concatenate(list(test_ds.map(lambda x, y: y).as_numpy_iterator()))
+    pred = np.where(model.predict(test_ds) > 0.5, 1, 0)
+
+    with open(save_path, 'w') as f:
+        f.write(str(metrics.confusion_matrix(y, pred)) + "\n")
+        f.write(str(metrics.precision_score(y, pred)) + "\n")
+        f.write(str(metrics.recall_score(y, pred)) + "\n")
 
 
 def optimize_hyperparameters(ds_list: list[tf.data.Dataset], logs_dir: pathlib.Path, hparams: dict, **params):
@@ -199,10 +216,10 @@ def optimize_hyperparameters(ds_list: list[tf.data.Dataset], logs_dir: pathlib.P
 
 def get_hyperparameters(**settings):
     parser = argparse.ArgumentParser(description='Test hyperparameter combinations.')
-    parser.add_argument('--preprocess-model', nargs='*', type=str, default=['bert_en_uncased_L-12_H-768_A-12'])
-    parser.add_argument('--embed-model', nargs='*', type=str, default=['bert_en_uncased_L-12_H-768_A-12'])
+    parser.add_argument('--preprocess-model', nargs='*', type=str, default=['bert_en_uncased_L-4_H-512_A-8'])
+    parser.add_argument('--embed-model', nargs='*', type=str, default=['bert_en_uncased_L-4_H-512_A-8'])
     parser.add_argument('--dropout', nargs='*', type=float, default=[0.1, 0.2, 0.3, 0.4, 0.5])
-    parser.add_argument('conda ', '--initial-learning-rate', nargs='*', type=float,
+    parser.add_argument('-init-lr', '--initial-learning-rate', nargs='*', type=float,
                         default=[1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7])
     parser.add_argument('-wp', '--warmup-percentage', nargs='*', type=float, default=[0.1])
 
